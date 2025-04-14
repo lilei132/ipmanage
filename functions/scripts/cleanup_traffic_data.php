@@ -3,6 +3,11 @@
  * 流量数据清理脚本
  * 
  * 用于删除错误的零值流量数据和今天下午修改前的无效数据
+ * 
+ * 可选参数：
+ *   --date=YYYY-MM-DD 删除指定日期之前的所有数据
+ *   --days=30 保留最近30天的数据（与date参数互斥）
+ *   --no-optimize 跳过表优化步骤
  */
 
 // 设置时区和脚本执行时间限制
@@ -15,6 +20,12 @@ ini_set('display_errors', 1);
 
 // 引入phpIPAM核心函数
 require_once dirname(__FILE__) . '/../functions.php';
+
+// 解析命令行参数
+$options = getopt('', ['date::', 'days::', 'no-optimize::']);
+$specific_date = isset($options['date']) ? $options['date'] : null;
+$keep_days = isset($options['days']) ? intval($options['days']) : null;
+$skip_optimize = isset($options['no-optimize']);
 
 // 初始化数据库连接
 $Database = new Database_PDO;
@@ -34,7 +45,51 @@ try {
     $total_records = 0;
 }
 
-// 第1步：删除入站和出站流量都为0的记录
+// 第1步：处理特定日期清理或保留天数清理
+if ($specific_date || $keep_days !== null) {
+    try {
+        $delete_query = "";
+        $delete_count_query = "";
+        
+        if ($specific_date) {
+            // 验证日期格式
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $specific_date)) {
+                echo "错误: 日期格式无效，应为 YYYY-MM-DD\n";
+                exit(1);
+            }
+            
+            $cutoff_date = $specific_date . " 00:00:00";
+            echo "将删除 {$cutoff_date} 之前的所有数据...\n";
+            
+            $delete_count_query = "SELECT COUNT(*) as total FROM port_traffic_history WHERE timestamp < ?";
+            $delete_query = "DELETE FROM port_traffic_history WHERE timestamp < ?";
+            $params = array($cutoff_date);
+        } elseif ($keep_days !== null) {
+            $cutoff_date = date('Y-m-d H:i:s', strtotime("-{$keep_days} days"));
+            echo "将保留最近 {$keep_days} 天的数据，删除 {$cutoff_date} 之前的所有数据...\n";
+            
+            $delete_count_query = "SELECT COUNT(*) as total FROM port_traffic_history WHERE timestamp < ?";
+            $delete_query = "DELETE FROM port_traffic_history WHERE timestamp < ?";
+            $params = array($cutoff_date);
+        }
+        
+        // 先计算满足条件的记录数
+        $count_result = $Database->getObjectsQuery("port_traffic_history", $delete_count_query, $params);
+        $date_deleted = $count_result[0]->total;
+        
+        // 执行删除
+        if ($date_deleted > 0) {
+            $Database->runQuery($delete_query, $params);
+            echo "按日期删除: {$date_deleted} 条记录\n";
+        } else {
+            echo "没有找到需要按日期删除的记录\n";
+        }
+    } catch (Exception $e) {
+        echo "按日期删除记录时出错: " . $e->getMessage() . "\n";
+    }
+}
+
+// 第2步：删除入站和出站流量都为0的记录
 $zero_traffic_query = "DELETE FROM port_traffic_history WHERE in_octets = 0 AND out_octets = 0";
 try {
     // 先计算满足条件的记录数
@@ -43,13 +98,17 @@ try {
     $zero_deleted = $count_result[0]->total;
     
     // 然后删除
-    $Database->runQuery($zero_traffic_query);
-    echo "删除零流量记录: {$zero_deleted} 条记录\n";
+    if ($zero_deleted > 0) {
+        $Database->runQuery($zero_traffic_query);
+        echo "删除零流量记录: {$zero_deleted} 条记录\n";
+    } else {
+        echo "没有找到零流量记录\n";
+    }
 } catch (Exception $e) {
     echo "删除零流量记录时出错: " . $e->getMessage() . "\n";
 }
 
-// 第2步：删除重复记录，保留每个设备-接口-时间戳组合中流量最高的记录
+// 第3步：删除重复记录，保留每个设备-接口-时间戳组合中流量最高的记录
 echo "开始删除重复记录...\n";
 
 try {
@@ -143,7 +202,7 @@ try {
     echo "删除重复记录时出错: " . $e->getMessage() . "\n";
 }
 
-// 第3步：删除明显异常的数据（如极大值）
+// 第4步：删除明显异常的数据（如极大值）
 try {
     // 先计算满足条件的记录数
     $count_abnormal_query = "SELECT COUNT(*) as total FROM port_traffic_history WHERE in_octets > 1000000000000000 OR out_octets > 1000000000000000";
@@ -158,7 +217,7 @@ try {
     echo "删除异常大值记录时出错: " . $e->getMessage() . "\n";
 }
 
-// 第4步：获取清理后的总记录数
+// 第5步：获取清理后的总记录数
 $remaining_records_query = "SELECT COUNT(*) as total FROM port_traffic_history";
 try {
     $remaining_result = $Database->getObjectsQuery("port_traffic_history", $remaining_records_query);
@@ -173,13 +232,17 @@ try {
     echo "获取剩余记录数时出错: " . $e->getMessage() . "\n";
 }
 
-// 第5步：优化表
-echo "正在优化数据表...\n";
-try {
-    $Database->runQuery("OPTIMIZE TABLE port_traffic_history");
-    echo "表优化完成!\n";
-} catch (Exception $e) {
-    echo "表优化失败: " . $e->getMessage() . "\n";
+// 第6步：优化表
+if (!$skip_optimize) {
+    echo "正在优化数据表...\n";
+    try {
+        $Database->runQuery("OPTIMIZE TABLE port_traffic_history");
+        echo "表优化完成!\n";
+    } catch (Exception $e) {
+        echo "表优化失败: " . $e->getMessage() . "\n";
+    }
+} else {
+    echo "跳过表优化步骤\n";
 }
 
 exit(0); 
