@@ -22,14 +22,14 @@ $delete_before_date = "2023-04-08 00:00:00";
 
 // 先计算将要删除的记录数
 $count_query = "SELECT COUNT(*) as count FROM `port_traffic_history` WHERE `timestamp` < ?";
-$count = $Database->getObjectQuery($count_query, array($delete_before_date));
+$count = $Database->getObjectsQuery("port_traffic_history", $count_query, array($delete_before_date));
 
-if ($count === false) {
+if (empty($count)) {
     print_r("Error: Unable to count records.\n");
     exit(1);
 }
 
-$total_records = $count->count;
+$total_records = $count[0]->count;
 print_r("将删除 $total_records 条4月8日前的流量记录。\n");
 
 // 执行删除操作
