@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流量监控 - 测试页面</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>流量监控测试页面</h1>
+    
+    <div>
+        <button id="test-btn">测试数据获取</button>
+        <button id="debug-btn">调试信息</button>
+    </div>
+    
+    <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;"></div>
+    
+    <script>
+        $(document).ready(function() {
+            $('#test-btn').click(function() {
+                $('#result').html('加载中...');
+                
+                $.ajax({
+                    url: 'test_data.php',
+                    method: 'GET',
+                    data: {
+                        deviceId: 1,
+                        interfaceId: 1
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('数据获取成功:', response);
+                        
+                        let html = '<h3>数据获取成功</h3>';
+                        html += '<p>记录数: ' + response.count + '</p>';
+                        
+                        if (response.in_data && response.in_data.length > 0) {
+                            html += '<h4>入流量数据点:</h4>';
+                            html += '<ul>';
+                            for (let i = 0; i < Math.min(5, response.in_data.length); i++) {
+                                const point = response.in_data[i];
+                                const date = new Date(point[0]);
+                                html += '<li>时间: ' + date.toLocaleString() + ', 值: ' + formatBits(point[1]) + '</li>';
+                            }
+                            html += '</ul>';
+                        }
+                        
+                        if (response.out_data && response.out_data.length > 0) {
+                            html += '<h4>出流量数据点:</h4>';
+                            html += '<ul>';
+                            for (let i = 0; i < Math.min(5, response.out_data.length); i++) {
+                                const point = response.out_data[i];
+                                const date = new Date(point[0]);
+                                html += '<li>时间: ' + date.toLocaleString() + ', 值: ' + formatBits(point[1]) + '</li>';
+                            }
+                            html += '</ul>';
+                        }
+                        
+                        $('#result').html(html);
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        console.error('请求失败:', textStatus, errorThrown);
+                        console.error('错误详情:', jqXHR.responseText);
+                        
+                        $('#result').html('<div style="color: red;">' +
+                            '<h3>请求失败</h3>' +
+                            '<p>状态: ' + textStatus + '</p>' +
+                            '<p>错误: ' + errorThrown + '</p>' +
+                            '<p>状态码: ' + jqXHR.status + '</p>' +
+                            '<pre>' + jqXHR.responseText + '</pre>' +
+                        '</div>');
+                    }
+                });
+            });
+            
+            $('#debug-btn').click(function() {
+                $('#result').html('加载中...');
+                
+                // 尝试获取设备和接口信息
+                $.ajax({
+                    url: '/app/tools/traffic-monitor/index.php',
+                    method: 'GET',
+                    data: {
+                        getDeviceInterfaces: 1
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('接口数据获取成功:', response);
+                        
+                        let html = '<h3>接口数据获取成功</h3>';
+                        html += '<pre>' + JSON.stringify(response, null, 2) + '</pre>';
+                        
+                        $('#result').html(html);
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        console.error('接口请求失败:', textStatus, errorThrown);
+                        console.error('错误详情:', jqXHR.responseText);
+                        
+                        $('#result').html('<div style="color: red;">' +
+                            '<h3>接口请求失败</h3>' +
+                            '<p>状态: ' + textStatus + '</p>' +
+                            '<p>错误: ' + errorThrown + '</p>' +
+                            '<p>状态码: ' + jqXHR.status + '</p>' +
+                            '<pre>' + jqXHR.responseText + '</pre>' +
+                        '</div>');
+                    }
+                });
+            });
+            
+            function formatBits(bits) {
+                if (bits === 0) return '0 bps';
+                
+                const units = ['bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps'];
+                let i = 0;
+                
+                while (bits >= 1000 && i < units.length - 1) {
+                    bits /= 1000;
+                    i++;
+                }
+                
+                return bits.toFixed(2) + ' ' + units[i];
+            }
+        });
+    </script>
+</body>
+</html> 
