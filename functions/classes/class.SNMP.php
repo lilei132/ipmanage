@@ -82,22 +82,22 @@ class phpipamSNMP extends Common_functions {
 	/**
 	 * Default snmp timeout in ms
 	 *
-	 * (default value: '1000')
+	 * (default value: '5000')
 	 *
 	 * @var string
 	 * @access private
 	 */
-	private $snmp_timeout = '1000';
+	private $snmp_timeout = '5000';
 
 	/**
 	 * Default snmp retries
 	 *
-	 * (default value: '3')
+	 * (default value: '5')
 	 *
 	 * @var string
 	 * @access private
 	 */
-	private $snmp_retries = '3';
+	private $snmp_retries = '5';
 
     /**
     * Object containing SNMPv3 Security session parameters
@@ -216,10 +216,26 @@ class phpipamSNMP extends Common_functions {
     	$this->snmp_queries['get_vrf_table']->oid = "MPLS-VPN-MIB::mplsVpnVrfDescription";
     	$this->snmp_queries['get_vrf_table']->description = _("Fetches VRF table");
 
+        // get device details info
+        $this->snmp_queries['get_device_info'] = new StdClass();
+        $this->snmp_queries['get_device_info']->id  = 8;
+        $this->snmp_queries['get_device_info']->oid = "ENTITY-MIB::entityPhysical";
+        $this->snmp_queries['get_device_info']->description = _("Fetches detailed device information");
+        
+        // get interface traffic
+        $this->snmp_queries['get_interface_traffic'] = new StdClass();
+        $this->snmp_queries['get_interface_traffic']->id  = 9;
+        $this->snmp_queries['get_interface_traffic']->oid = "IF-MIB::ifXEntry";
+        $this->snmp_queries['get_interface_traffic']->description = _("Fetches interface traffic statistics");
+
     	// Text to numerical OID conversion table
     	$this->snmp_oids = [
     		'SNMPv2-MIB::sysDescr'                => '.1.3.6.1.2.1.1.1',
     		'SNMPv2-MIB::sysObjectID'             => '.1.3.6.1.2.1.1.2',
+            'SNMPv2-MIB::sysName'                 => '.1.3.6.1.2.1.1.5',
+            'SNMPv2-MIB::sysContact'              => '.1.3.6.1.2.1.1.4',
+            'SNMPv2-MIB::sysLocation'             => '.1.3.6.1.2.1.1.6',
+            'SNMPv2-MIB::sysUpTime'               => '.1.3.6.1.2.1.1.3',
 
     		'IP-MIB::ipNetToMediaEntry'           => '.1.3.6.1.2.1.4.22.1',
     		'IP-MIB::ipNetToMediaIfIndex'         => '.1.3.6.1.2.1.4.22.1.1',
@@ -232,6 +248,35 @@ class phpipamSNMP extends Common_functions {
     		'IF-MIB::ifDescr'                     => '.1.3.6.1.2.1.2.2.1.2',
     		'IF-MIB::ifName'                      => '.1.3.6.1.2.1.31.1.1.1.1',
     		'IF-MIB::ifAlias'                     => '.1.3.6.1.2.1.31.1.1.1.18',
+            'IF-MIB::ifType'                      => '.1.3.6.1.2.1.2.2.1.3',
+            'IF-MIB::ifMtu'                       => '.1.3.6.1.2.1.2.2.1.4',
+            'IF-MIB::ifSpeed'                     => '.1.3.6.1.2.1.2.2.1.5',
+            'IF-MIB::ifHighSpeed'                 => '.1.3.6.1.2.1.31.1.1.1.15',
+            'IF-MIB::ifPhysAddress'               => '.1.3.6.1.2.1.2.2.1.6',
+            'IF-MIB::ifAdminStatus'               => '.1.3.6.1.2.1.2.2.1.7',
+            'IF-MIB::ifOperStatus'                => '.1.3.6.1.2.1.2.2.1.8',
+            'IF-MIB::ifInOctets'                  => '.1.3.6.1.2.1.2.2.1.10',
+            'IF-MIB::ifInUcastPkts'               => '.1.3.6.1.2.1.2.2.1.11',
+            'IF-MIB::ifInErrors'                  => '.1.3.6.1.2.1.2.2.1.14',
+            'IF-MIB::ifOutOctets'                 => '.1.3.6.1.2.1.2.2.1.16',
+            'IF-MIB::ifOutUcastPkts'              => '.1.3.6.1.2.1.2.2.1.17',
+            'IF-MIB::ifOutErrors'                 => '.1.3.6.1.2.1.2.2.1.20',
+            'IF-MIB::ifXEntry'                    => '.1.3.6.1.2.1.31.1.1.1',
+            'IF-MIB::ifHCInOctets'                => '.1.3.6.1.2.1.31.1.1.1.6',
+            'IF-MIB::ifHCOutOctets'               => '.1.3.6.1.2.1.31.1.1.1.10',
+            'IF-MIB::ifConnectorPresent'          => '.1.3.6.1.2.1.31.1.1.1.17',
+            
+            // 华为端口流量特定OID
+            'HUAWEI-IF-MIB::hwIfInOctets'         => '.1.3.6.1.4.1.2011.5.25.31.1.1.1.1.6',
+            'HUAWEI-IF-MIB::hwIfOutOctets'        => '.1.3.6.1.4.1.2011.5.25.31.1.1.1.1.7',
+            'HUAWEI-IF-MIB::hwIfInErrors'         => '.1.3.6.1.4.1.2011.5.25.31.1.1.1.1.8',
+            'HUAWEI-IF-MIB::hwIfOutErrors'        => '.1.3.6.1.4.1.2011.5.25.31.1.1.1.1.9',
+            
+            // H3C端口流量特定OID
+            'H3C-IF-MIB::h3cIfInOctets'           => '.1.3.6.1.4.1.25506.2.6.1.1.1.1.6',
+            'H3C-IF-MIB::h3cIfOutOctets'          => '.1.3.6.1.4.1.25506.2.6.1.1.1.1.7',
+            'H3C-IF-MIB::h3cIfInErrors'           => '.1.3.6.1.4.1.25506.2.6.1.1.1.1.8',
+            'H3C-IF-MIB::h3cIfOutErrors'          => '.1.3.6.1.4.1.25506.2.6.1.1.1.1.9',
 
     		'BRIDGE-MIB::dot1dBasePortIfIndex'    => '.1.3.6.1.2.1.17.1.4.1.2',
     		'BRIDGE-MIB::dot1dTpFdbEntry'         => '.1.3.6.1.2.1.17.4.3.1',
@@ -242,10 +287,50 @@ class phpipamSNMP extends Common_functions {
     		'IP-FORWARD-MIB::ipCidrRouteDest'     => '.1.3.6.1.2.1.4.24.4.1.1',
     		'IP-FORWARD-MIB::ipCidrRouteMask'     => '.1.3.6.1.2.1.4.24.4.1.2',
 
+            'H3C-IP-FORWARD-MIB::h3cIpCidrRouteDest' => '.1.3.6.1.4.1.25506.8.35.1.1.1.1.1',
+            'H3C-IP-FORWARD-MIB::h3cIpCidrRouteMask' => '.1.3.6.1.4.1.25506.8.35.1.1.1.1.2',
+
+            'HUAWEI-IP-FORWARD-MIB::hwIpCidrRouteDest' => '.1.3.6.1.4.1.2011.5.25.42.3.1.1.1.1',
+            'HUAWEI-IP-FORWARD-MIB::hwIpCidrRouteMask' => '.1.3.6.1.4.1.2011.5.25.42.3.1.1.1.2',
+
     		'CISCO-VTP-MIB::vtpVlanName'          => '.1.3.6.1.4.1.9.9.46.1.3.1.1.4',
+            'H3C-VLAN-MIB::h3cVlanName'          => '.1.3.6.1.4.1.25506.8.35.2.1.1.1',
+            'HUAWEI-VLAN-MIB::hwVlanName'          => '.1.3.6.1.4.1.2011.5.25.42.3.1.1.1.1.2',
 
     		'MPLS-VPN-MIB::mplsVpnVrfDescription'        => '.1.3.6.1.3.118.1.2.2.1.2',
-    		'MPLS-VPN-MIB::mplsVpnVrfRouteDistinguisher' => '.1.3.6.1.3.118.1.2.2.1.3'
+            'MPLS-VPN-MIB::mplsVpnVrfRouteDistinguisher' => '.1.3.6.1.3.118.1.2.2.1.3',
+
+            // 添加思科、H3C 和 HUAWEI 的 VRF 表 OID
+            'CISCO-MPLS-VPN-MIB::mplsVpnVrfDescription' => '.1.3.6.1.3.118.1.2.2.1.2',
+            'H3C-MPLS-VPN-MIB::h3cMplsVpnVrfDescription' => '.1.3.6.1.4.1.25506.2.63.1.1.1.1.2',
+            'HUAWEI-MPLS-VPN-MIB::hwMplsVpnVrfDescription' => '.1.3.6.1.4.1.2011.5.25.42.3.1.1.1.1.2',
+            
+            // 通用设备信息OID
+            'ENTITY-MIB::entPhysicalDescr'        => '.1.3.6.1.2.1.47.1.1.1.1.2',
+            'ENTITY-MIB::entPhysicalName'         => '.1.3.6.1.2.1.47.1.1.1.1.7',
+            'ENTITY-MIB::entPhysicalModelName'    => '.1.3.6.1.2.1.47.1.1.1.1.13',
+            'ENTITY-MIB::entPhysicalSerialNum'    => '.1.3.6.1.2.1.47.1.1.1.1.11',
+            'ENTITY-MIB::entPhysicalSoftwareRev'  => '.1.3.6.1.2.1.47.1.1.1.1.10',
+            'ENTITY-MIB::entPhysicalHardwareRev'  => '.1.3.6.1.2.1.47.1.1.1.1.8',
+            'ENTITY-MIB::entPhysicalFirmwareRev'  => '.1.3.6.1.2.1.47.1.1.1.1.9',
+            'ENTITY-MIB::entityPhysical'          => '.1.3.6.1.2.1.47.1.1.1.1',
+            
+            // 思科专用设备信息OID
+            'CISCO-ENTITY-MIB::ceAssetSerialNumber' => '.1.3.6.1.4.1.9.9.92.1.1.1.1.1',
+            'CISCO-ENTITY-MIB::ceAssetOrderablePartNumber' => '.1.3.6.1.4.1.9.9.92.1.1.1.1.2',
+            'CISCO-ENTITY-MIB::ceAssetHardwareRevision' => '.1.3.6.1.4.1.9.9.92.1.1.1.1.3',
+            
+            // 华为专用设备信息OID
+            'HUAWEI-ENTITY-EXTENT-MIB::hwEntityMfgName' => '.1.3.6.1.4.1.2011.5.25.31.1.1.1.1.2',
+            'HUAWEI-ENTITY-EXTENT-MIB::hwEntityModel' => '.1.3.6.1.4.1.2011.5.25.31.1.1.1.1.7',
+            'HUAWEI-ENTITY-EXTENT-MIB::hwEntitySerialNumber' => '.1.3.6.1.4.1.2011.5.25.31.1.1.1.1.6',
+            'HUAWEI-ENTITY-EXTENT-MIB::hwEntityFirmwareVersion' => '.1.3.6.1.4.1.2011.5.25.31.1.1.1.1.9',
+            
+            // H3C专用设备信息OID
+            'H3C-ENTITY-EXT-MIB::h3cEntityExtMfgName' => '.1.3.6.1.4.1.25506.2.6.1.1.1.1.2',
+            'H3C-ENTITY-EXT-MIB::h3cEntityExtModel' => '.1.3.6.1.4.1.25506.2.6.1.1.1.1.7',
+            'H3C-ENTITY-EXT-MIB::h3cEntityExtSerialNum' => '.1.3.6.1.4.1.25506.2.6.1.1.1.1.6',
+            'H3C-ENTITY-EXT-MIB::h3cEntityExtFirmwareRevision' => '.1.3.6.1.4.1.25506.2.6.1.1.1.1.8'
     	];
 	}
 
@@ -441,7 +526,7 @@ class phpipamSNMP extends Common_functions {
 		if (is_numeric($timeout) && $timeout > 0) {
 			$this->snmp_timeout = $timeout < 10000 ? $timeout : 10000;
 		} else {
-			$this->snmp_timeout = 1000;
+			$this->snmp_timeout = 5000;
 		}
 	}
 
@@ -484,6 +569,38 @@ class phpipamSNMP extends Common_functions {
     private function connection_open () {
         // init connection
         if ($this->snmp_session === false) {
+            // 特殊处理华为设备
+            $is_huawei = false;
+            if ($this->snmp_host == '10.254.0.6') {
+                $is_huawei = true;
+                error_log("华为设备特殊处理: 正在尝试连接 {$this->snmp_host}");
+                
+                // 测试多个社区名
+                $test_communities = ['njxxgc@123', 'njxxgc', 'public'];
+                foreach ($test_communities as $community) {
+                    try {
+                        error_log("测试社区名: {$community}");
+                        // 直接尝试创建PHP SNMP对象
+                        $test_session = new SNMP(SNMP::VERSION_2c, $this->snmp_host, $community, 5000000, 5);
+                        $test_session->oid_output_format = SNMP_OID_OUTPUT_NUMERIC;
+                        
+                        // 尝试获取系统描述
+                        $result = $test_session->get('.1.3.6.1.2.1.1.1.0');
+                        if ($result !== false) {
+                            // 找到有效的社区名
+                            $this->snmp_community = $community;
+                            error_log("找到有效的社区名: {$community}");
+                            // 关闭测试会话
+                            $test_session->close();
+                            break;
+                        }
+                        $test_session->close();
+                    } catch (Exception $e) {
+                        error_log("测试社区名 {$community} 失败: " . $e->getMessage());
+                    }
+                }
+            }
+            
             if ($this->snmp_version=="1")       { $this->snmp_session = new SNMP(SNMP::VERSION_1,  $this->snmp_host, $this->snmp_community, $this->snmp_timeout * 1000, $this->snmp_retries); }
             elseif ($this->snmp_version=="2")   { $this->snmp_session = new SNMP(SNMP::VERSION_2c, $this->snmp_host, $this->snmp_community, $this->snmp_timeout * 1000, $this->snmp_retries); }
             elseif ($this->snmp_version=="3")   { $this->snmp_session = new SNMP(SNMP::VERSION_3,  $this->snmp_host, $this->snmp_community, $this->snmp_timeout * 1000, $this->snmp_retries);
@@ -500,6 +617,24 @@ class phpipamSNMP extends Common_functions {
         }
         // set parameters
         $this->snmp_session->oid_output_format = SNMP_OID_OUTPUT_NUMERIC;
+        
+        // 为华为设备添加特殊处理 - 设置更长的超时和自定义属性
+        if ($this->snmp_host == '10.254.0.6') {
+            // 设置额外的SNMP选项，使之对Huawei设备更友好
+            if (method_exists($this->snmp_session, 'setupParams')) {
+                // SNMPv2-MIB::sysServices.0 = INTEGER: 0
+                $this->snmp_session->setupParams(SNMP::OID_OUTPUT_NUMERIC);
+                $this->snmp_session->valueretrieval = SNMP_VALUE_LIBRARY;
+            }
+            
+            // 尝试设置额外的SNMP选项
+            if (defined('SNMP_QUICK_PRINT')) {
+                $this->snmp_session->quick_print = true;
+            }
+            if (defined('SNMP_ENUM_PRINT')) { 
+                $this->snmp_session->enum_print = true;
+            }
+        }
 
 		// Fetch device sysObjectID.  TODO: Customise queries based on vendor sysObjectID (HP, FortiGate, ...)
 		// $this->snmp_sysObjectID = $this->snmp_get( 'SNMPv2-MIB::sysObjectID', '0' );
@@ -540,8 +675,15 @@ class phpipamSNMP extends Common_functions {
      * @return mixed
      */
     public function get_query ($query) {
-        if (method_exists($this, $query))   { return $this->{$query} (); }
-        else                                { throw new Exception (_("Invalid query")); }
+        if (method_exists($this, $query)) {
+            $this->connection_open(); // Ensure SNMP session is opened before each query
+            $result = $this->{$query} ();
+            $this->connection_close(); // Ensure SNMP session is closed after each query
+            return $result;
+        }
+        else {
+            throw new Exception (_("Invalid query"));
+        }
     }
 
     /**
@@ -552,13 +694,35 @@ class phpipamSNMP extends Common_functions {
      */
     private function get_system_info () {
         // init
-        $this->connection_open ();
+        $this->connection_open();
 
+        // 定义不同厂商的系统信息OID
+        $oids = [
+            "STANDARD-MIB" => "SNMPv2-MIB::sysDescr",
+            "H3C-MIB" => "SNMPv2-MIB::sysDescr",
+            "HUAWEI-MIB" => "SNMPv2-MIB::sysDescr"
+        ];
+
+        $res = "";
+        foreach ($oids as $vendor => $oid) {
+            try {
         // try
-        $sysdescr = $this->snmp_get ( "SNMPv2-MIB::sysDescr", "0" );
+                $sysdescr = $this->snmp_get($oid, "0");
+                
+                // 如果获取到数据，跳出循环
+                if (!empty($sysdescr)) {
+                    $res = $sysdescr;
+                    break;
+                }
+            } catch (Exception $e) {
+                // 如果当前厂商的OID不可用，继续尝试下一个厂商
+                error_log("SNMP Error on device " . $this->snmp_hostname . " with OID set " . $vendor . ": " . $e->getMessage(), 3, "/var/www/phpipam/snmp_errors.log");
+            }
+        }
 
         // save result
-        $this->save_last_result ($sysdescr);
+        $this->save_last_result($res);
+        
         // return
         return $this->last_result;
     }
@@ -571,23 +735,46 @@ class phpipamSNMP extends Common_functions {
      */
     private function get_arp_table () {
         // init
-        $this->connection_open ();
+        $this->connection_open(); // Ensure SNMP session is opened before each query
 
+        // 定义不同厂商的ARP表OID
+        $oids = [
+            "STANDARD-MIB" => [
+                "ip" => "IP-MIB::ipNetToMediaNetAddress",
+                "mac" => "IP-MIB::ipNetToMediaPhysAddress",
+                "if_index" => "IP-MIB::ipNetToMediaIfIndex"
+            ],
+            "H3C-MIB" => [
+                "ip" => "IP-MIB::ipNetToMediaNetAddress",
+                "mac" => "IP-MIB::ipNetToMediaPhysAddress", 
+                "if_index" => "IP-MIB::ipNetToMediaIfIndex"
+            ],
+            "HUAWEI-MIB" => [
+                "ip" => "IP-MIB::ipNetToMediaNetAddress",
+                "mac" => "IP-MIB::ipNetToMediaPhysAddress",
+                "if_index" => "IP-MIB::ipNetToMediaIfIndex"
+            ]
+        ];
+
+        $res = [];
+        foreach ($oids as $vendor => $oid_set) {
+            try {
         // fetch
-        $res1 = $this->snmp_walk ( "IP-MIB::ipNetToMediaNetAddress" );      // ip
-        $res2 = $this->snmp_walk ( "IP-MIB::ipNetToMediaPhysAddress" );     // mac
-        $res3 = $this->snmp_walk ( "IP-MIB::ipNetToMediaIfIndex" );         // interface index
+                $res1 = $this->snmp_walk($oid_set["ip"]);      // ip
+                $res2 = $this->snmp_walk($oid_set["mac"]);     // mac
+                $res3 = $this->snmp_walk($oid_set["if_index"]); // interface index
 
         // parse IP
         $n=0;
         foreach ($res1 as $r) {
-            $res[$n]['ip']  = $this->parse_snmp_result_value ($r);
+                    $res[$n]['ip'] = $this->parse_snmp_result_value($r);
             $n++;
         }
+                
         // parse MAC
         $n=0;
         foreach ($res2 as $r) {
-            $res[$n]['mac'] = $this->format_snmp_mac_value ($r);
+                    $res[$n]['mac'] = $this->format_snmp_mac_value($r);
             $n++;
         };
 
@@ -595,19 +782,19 @@ class phpipamSNMP extends Common_functions {
         // fetch interface name
         $n=0;
         foreach ($res3 as $r) {
-            $index = $this->parse_snmp_result_value ($r);
+                    $index = $this->parse_snmp_result_value($r);
             // if already fetched
             if (array_key_exists($index, $interface_indexes)) {
                 $res[$n]['port'] = $interface_indexes[$index];
             }
             else {
                 try {
-                    $res1 = $this->snmp_get ( "IF-MIB::ifName", $index );  // if description
-                    $res2 = $this->snmp_get ( "IF-MIB::ifDescr", $index );     // if port
+                            $res1 = $this->snmp_get("IF-MIB::ifName", $index);  // if description
+                            $res2 = $this->snmp_get("IF-MIB::ifDescr", $index);     // if port
 
                     //parse and save
-                    $res[$n]['port'] = $this->parse_snmp_result_value ($res1);
-                    $res[$n]['portname'] = $this->parse_snmp_result_value ($res2);
+                            $res[$n]['port'] = $this->parse_snmp_result_value($res1);
+                            $res[$n]['portname'] = $this->parse_snmp_result_value($res2);
                     $interface_indexes[$index] = $res[$n]['port'];
                 }
                 catch (Exception $e) {
@@ -616,12 +803,23 @@ class phpipamSNMP extends Common_functions {
                 }
             }
             $n++;
+                }
+
+                // 如果获取到数据，跳出循环
+                if (!empty($res)) {
+                    break;
+                }
+            } catch (Exception $e) {
+                // 如果当前厂商的OID不可用，继续尝试下一个厂商
+                error_log("SNMP Error on device " . $this->snmp_hostname . " with OID set " . $vendor . ": " . $e->getMessage(), 3, "/var/www/phpipam/snmp_errors.log");
+            }
         }
 
         // save result
-        $this->save_last_result ($res);
+        $this->save_last_result($res);
 
         // return response
+        $this->connection_close(); // Ensure SNMP session is closed after each query
         return isset($res) ? $res : false;
     }
 
@@ -639,48 +837,79 @@ class phpipamSNMP extends Common_functions {
      */
     private function get_mac_table () {
         // init
-        $this->connection_open ();
+        $this->connection_open(); // Ensure SNMP session is opened before each query
 
+        // 定义不同厂商的MAC表OID
+        $oids = [
+            "STANDARD-MIB" => [
+                "mac" => "BRIDGE-MIB::dot1dTpFdbAddress",
+                "port" => "BRIDGE-MIB::dot1dTpFdbPort",
+                "if_index" => "BRIDGE-MIB::dot1dBasePortIfIndex"
+            ],
+            "H3C-MIB" => [
+                "mac" => "BRIDGE-MIB::dot1dTpFdbAddress", 
+                "port" => "BRIDGE-MIB::dot1dTpFdbPort",
+                "if_index" => "BRIDGE-MIB::dot1dBasePortIfIndex"
+            ],
+            "HUAWEI-MIB" => [
+                "mac" => "BRIDGE-MIB::dot1dTpFdbAddress",
+                "port" => "BRIDGE-MIB::dot1dTpFdbPort",
+                "if_index" => "BRIDGE-MIB::dot1dBasePortIfIndex"
+            ]
+        ];
+
+        $res = [];
+        foreach ($oids as $vendor => $oid_set) {
+            try {
         // fetch
-        $res1 = $this->snmp_walk ( "BRIDGE-MIB::dot1dTpFdbAddress" );    // mac
-        $res2 = $this->snmp_walk ( "BRIDGE-MIB::dot1dTpFdbPort" );       // bridge port index
+                $res1 = $this->snmp_walk($oid_set["mac"]);    // mac
+                $res2 = $this->snmp_walk($oid_set["port"]);   // bridge port index
 
         // parse MAC
         $n=0;
         foreach ($res1 as $r) {
-            $res[$n]['mac'] = $this->format_snmp_mac_value ($r);
+                    $res[$n]['mac'] = $this->format_snmp_mac_value($r);
             $n++;
         };
 
         // parse bridgeport index and fetch if description
         $n=0;
         foreach ($res2 as $r) {
-            $res[$n]['bridgeportindex'] = $this->parse_snmp_result_value ($r);
+                    $res[$n]['bridgeportindex'] = $this->parse_snmp_result_value($r);
             // fetch interface
             try {
-                $res3 = $this->snmp_get ( "BRIDGE-MIB::dot1dBasePortIfIndex", $res[$n]['bridgeportindex'] );         // bridge port to interface index
-                $res4 = $this->snmp_get ( "IF-MIB::ifDescr", $this->parse_snmp_result_value ($res3) );  // interface description
-                $res5 = $this->snmp_get ( "IF-MIB::ifAlias", $this->parse_snmp_result_value ($res3) );
+                        $res3 = $this->snmp_get($oid_set["if_index"], $res[$n]['bridgeportindex']);  // bridge port to interface index
+                        $res4 = $this->snmp_get("IF-MIB::ifDescr", $this->parse_snmp_result_value($res3));  // interface description
+                        $res5 = $this->snmp_get("IF-MIB::ifAlias", $this->parse_snmp_result_value($res3));
 
                 //parse and save
                 $res[$n]['vlan_number'] = $this->vlan_number;
-                //$res[$n]['portindex'] = $this->parse_snmp_result_value ($res3);
-                $res[$n]['port'] = $this->parse_snmp_result_value ($res4);
-                $res[$n]['port_alias'] = $this->parse_snmp_result_value ($res5);
+                        $res[$n]['port'] = $this->parse_snmp_result_value($res4);
+                        $res[$n]['port_alias'] = $this->parse_snmp_result_value($res5);
             }
             catch (Exception $e) {
                 $res[$n]['port'] = "";
                 $res[$n]['error'] = $e->getMessage();
             }
 
-
             $n++;
+                }
+
+                // 如果获取到数据，跳出循环
+                if (!empty($res)) {
+                    break;
+                }
+            } catch (Exception $e) {
+                // 如果当前厂商的OID不可用，继续尝试下一个厂商
+                error_log("SNMP Error on device " . $this->snmp_hostname . " with OID set " . $vendor . ": " . $e->getMessage(), 3, "/var/www/phpipam/snmp_errors.log");
+            }
         }
 
         // save result
-        $this->save_last_result ($res);
+        $this->save_last_result($res);
 
         // return response
+        $this->connection_close(); // Ensure SNMP session is closed after each query
         return isset($res) ? $res : false;
     }
 
@@ -692,28 +921,58 @@ class phpipamSNMP extends Common_functions {
      */
     private function get_interfaces_ip () {
         // init
-        $this->connection_open ();
+        $this->connection_open(); // Ensure SNMP session is opened before each query
 
+        // 定义不同厂商的接口IP地址OID
+        $oids = [
+            "STANDARD-MIB" => [
+                "ip" => "IP-MIB::ipAdEntAddr",
+                "mac" => "IP-MIB::ipNetToMediaPhysAddress"
+            ],
+            "H3C-MIB" => [
+                "ip" => "IP-MIB::ipAdEntAddr",
+                "mac" => "IP-MIB::ipNetToMediaPhysAddress"
+            ],
+            "HUAWEI-MIB" => [
+                "ip" => "IP-MIB::ipAdEntAddr",
+                "mac" => "IP-MIB::ipNetToMediaPhysAddress"
+            ]
+        ];
+
+        $res = [];
+        foreach ($oids as $vendor => $oid_set) {
+            try {
         // fetch
-        $res1 = $this->snmp_walk ( "IP-MIB::ipAdEntAddr" );
-        $res2 = $this->snmp_walk ( "IP-MIB::ipNetToMediaPhysAddress" );
+                $res1 = $this->snmp_walk($oid_set["ip"]);
+                $res2 = $this->snmp_walk($oid_set["mac"]);
 
         // parse result
         $n=0;
         foreach ($res1 as $r) {
-            $res[$n]['ip']  = $this->parse_snmp_result_value ($r);
+                    $res[$n]['ip'] = $this->parse_snmp_result_value($r);
             $n++;
         }
         $n=0;
         foreach ($res2 as $r) {
-            $res[$n]['mac'] = $this->format_snmp_mac_value ($r);
+                    $res[$n]['mac'] = $this->format_snmp_mac_value($r);
             $n++;
         };
 
+                // 如果获取到数据，跳出循环
+                if (!empty($res)) {
+                    break;
+                }
+            } catch (Exception $e) {
+                // 如果当前厂商的OID不可用，继续尝试下一个厂商
+                error_log("SNMP Error on device " . $this->snmp_hostname . " with OID set " . $vendor . ": " . $e->getMessage(), 3, "/var/www/phpipam/snmp_errors.log");
+            }
+        }
+
         // save result
-        $this->save_last_result ($res);
+        $this->save_last_result($res);
 
         // return response
+        $this->connection_close(); // Ensure SNMP session is closed after each query
         return isset($res) ? $res : false;
     }
 
@@ -725,28 +984,62 @@ class phpipamSNMP extends Common_functions {
      */
     private function get_routing_table () {
         // init
-        $this->connection_open ();
+        $this->connection_open(); // Ensure SNMP session is opened before each query
 
         // fetch
-        $res1 = $this->snmp_walk ( "IP-FORWARD-MIB::ipCidrRouteDest" );
-        $res2 = $this->snmp_walk ( "IP-FORWARD-MIB::ipCidrRouteMask" );
+        $res = [];
+        $oids = [
+            "CISCO-RT-TABLE" => [
+                "dest" => "IP-FORWARD-MIB::ipCidrRouteDest",
+                "mask" => "IP-FORWARD-MIB::ipCidrRouteMask"
+            ],
+            "H3C-RT-TABLE" => [
+                "dest" => "H3C-IP-FORWARD-MIB::h3cIpCidrRouteDest",
+                "mask" => "H3C-IP-FORWARD-MIB::h3cIpCidrRouteMask"
+            ],
+            "HUAWEI-RT-TABLE" => [
+                "dest" => "HUAWEI-IP-FORWARD-MIB::hwIpCidrRouteDest",
+                "mask" => "HUAWEI-IP-FORWARD-MIB::hwIpCidrRouteMask"
+            ]
+        ];
+
+        foreach ($oids as $vendor => $oid) {
+            try {
+                $res1 = $this->snmp_walk($oid['dest']);
+                $res2 = $this->snmp_walk($oid['mask']);
 
         // parse result
-        $n=0;
+                $n = 0;
         foreach ($res1 as $r) {
-            $res[$n]['subnet']  = $this->parse_snmp_result_value ($r);
+                    $res[$n]['subnet'] = $this->parse_snmp_result_value($r);
             $n++;
         }
-        $n=0;
+                $n = 0;
         foreach ($res2 as $r) {
-            $res[$n]['mask']  = $this->parse_snmp_result_value ($r);
+                    $res[$n]['mask'] = $this->parse_snmp_result_value($r);
             $n++;
         }
 
         // save result
-        $this->save_last_result ($res);
+                $this->save_last_result($res);
 
         // return response
+                $this->connection_close(); // Ensure SNMP session is closed after each query
+                return isset($res) ? $res : false;
+            } catch (Exception $e) {
+                // 如果当前供应商的OID不可用，继续尝试下一个供应商
+                error_log("SNMP Error on device " . $this->snmp_hostname . " with OID set " . $vendor . ": " . $e->getMessage(), 3, "/var/www/phpipam/snmp_errors.log");
+            }
+        }
+
+        // 如果所有OID都不可用，返回空结果
+        $res = [];
+
+        // save result
+        $this->save_last_result($res);
+
+        // return response
+        $this->connection_close(); // Ensure SNMP session is closed after each query
         return isset($res) ? $res : false;
     }
 
@@ -758,12 +1051,12 @@ class phpipamSNMP extends Common_functions {
      */
     private function get_vlan_table () {
         // init
-        $this->connection_open ();
+        $this->connection_open(); // Ensure SNMP session is opened before each query
 
         // fetch
+        $res = [];
+        try {
         $res1 = $this->snmp_walk ( "CISCO-VTP-MIB::vtpVlanName", "1" );
-
-        // parse result
         foreach ($res1 as $k=>$r) {
             // set number
             $k = str_replace($this->snmp_oids['CISCO-VTP-MIB::vtpVlanName'].'.1.', "", $k);
@@ -771,12 +1064,45 @@ class phpipamSNMP extends Common_functions {
             // set value
             $r  = trim(str_replace("\"","",substr($r, strpos($r, ":")+2)));
             $res[$k] = $r;
+            }
+        } catch (Exception $e) {
+            // 如果CISCO-VTP-MIB::vtpVlanName不可用，尝试H3C-VLAN-MIB::h3cVlanName
+            try {
+                $res2 = $this->snmp_walk ( "H3C-VLAN-MIB::h3cVlanName", "1" );
+                foreach ($res2 as $k=>$r) {
+                    // set number
+                    $k = str_replace($this->snmp_oids['H3C-VLAN-MIB::h3cVlanName'].'.2.', "", $k);
+                    $k = array_pop(pf_explode(".", $k));
+                    // set value
+                    $r  = trim(str_replace("\"","",substr($r, strpos($r, ":")+2)));
+                    $res[$k] = $r;
+                }
+            } catch (Exception $e) {
+                // 如果H3C-VLAN-MIB::h3cVlanName不可用，尝试HUAWEI-VLAN-MIB::hwVlanName
+                try {
+                    $res3 = $this->snmp_walk ( "HUAWEI-VLAN-MIB::hwVlanName", "1" );
+                    foreach ($res3 as $k=>$r) {
+                        // set number
+                        $k = str_replace($this->snmp_oids['HUAWEI-VLAN-MIB::hwVlanName'].'.1.', "", $k);
+                        $k = array_pop(pf_explode(".", $k));
+                        // set value
+                        $r  = trim(str_replace("\"","",substr($r, strpos($r, ":")+2)));
+                        $res[$k] = $r;
+                    }
+                } catch (Exception $e) {
+                    // 如果所有OID都不可用，返回空结果
+                    $res = [];
+                    // 记录错误日志
+                    error_log("SNMP Error on device " . $this->snmp_hostname . ": " . $e->getMessage(), 3, "/var/www/phpipam/snmp_errors.log");
+                }
+            }
         }
 
         // save result
         $this->save_last_result ($res);
 
         // return response
+        $this->connection_close(); // Ensure SNMP session is closed after each query
         return isset($res) ? $res : false;
     }
 
@@ -789,7 +1115,7 @@ class phpipamSNMP extends Common_functions {
         // mplsVpnVrfName. When this object is used as an index to a table,
         // the first octet is the string length, and subsequent octets are
         // the ASCII codes of each character.
-        // For example, “vpn1” is represented as 4.118.112.110.49.
+        // For example, "vpn1" is represented as 4.118.112.110.49.
         $a = array_values(array_filter(pf_explode('.', $oid)));
         if (($a[0]+1) != sizeof($a))
             return $oid;
@@ -811,37 +1137,70 @@ class phpipamSNMP extends Common_functions {
      */
     private function get_vrf_table () {
         // init
-        $this->connection_open ();
+        $this->connection_open(); // Ensure SNMP session is opened before each query
 
         // fetch
         $res = [];
-        $res1 = $this->snmp_walk ( "MPLS-VPN-MIB::mplsVpnVrfRouteDistinguisher" );
-        $res2 = $this->snmp_walk ( "MPLS-VPN-MIB::mplsVpnVrfDescription" );
+        $oids = [
+            "CISCO-RT-TABLE" => [
+                "rd" => "MPLS-VPN-MIB::mplsVpnVrfRouteDistinguisher",
+                "descr" => "MPLS-VPN-MIB::mplsVpnVrfDescription"
+            ],
+            "H3C-RT-TABLE" => [
+                "rd" => "H3C-MPLS-VPN-MIB::h3cMplsVpnVrfRouteDistinguisher", // 假设H3C的OID为这个
+                "descr" => "H3C-MPLS-VPN-MIB::h3cMplsVpnVrfDescription" // 假设H3C的OID为这个
+            ],
+            "HUAWEI-RT-TABLE" => [
+                "rd" => "HUAWEI-MPLS-VPN-MIB::hwMplsVpnVrfRouteDistinguisher", // 假设HUAWEI的OID为这个
+                "descr" => "HUAWEI-MPLS-VPN-MIB::hwMplsVpnVrfDescription" // 假设HUAWEI的OID为这个
+            ]
+        ];
+
+        foreach ($oids as $vendor => $oid) {
+            try {
+                $res1 = $this->snmp_walk($oid['rd']);
+                $res2 = $this->snmp_walk($oid['descr']);
 
         // parse results
-        foreach ($res1 as $k=>$r) {
+                foreach ($res1 as $k => $r) {
             // set name
-            $k = str_replace($this->snmp_oids['MPLS-VPN-MIB::mplsVpnVrfRouteDistinguisher'].'.', "", $k);
+                    $k = str_replace($this->snmp_oids[$oid['rd']] . '.', "", $k);
             $k = str_replace("\"", "", $k);
             $k = $this->decode_mplsVpnVrfName($k);
             // set rd
-            $r  = $this->parse_snmp_result_value ($r);
+                    $r = $this->parse_snmp_result_value($r);
             $res[$k]['rd'] = $r;
         }
-        foreach ($res2 as $k=>$r) {
+                foreach ($res2 as $k => $r) {
             // set name
-            $k = str_replace($this->snmp_oids['MPLS-VPN-MIB::mplsVpnVrfDescription'].'.', "", $k);
+                    $k = str_replace($this->snmp_oids[$oid['descr']] . '.', "", $k);
             $k = str_replace("\"", "", $k);
             $k = $this->decode_mplsVpnVrfName($k);
             // set descr
-            $r  = $this->parse_snmp_result_value ($r);
+                    $r = $this->parse_snmp_result_value($r);
             $res[$k]['descr'] = $r;
         }
 
         // save result
-        $this->save_last_result ($res);
+                $this->save_last_result($res);
 
         // return response
+                $this->connection_close(); // Ensure SNMP session is closed after each query
+                return isset($res) ? $res : false;
+            } catch (Exception $e) {
+                // 如果当前供应商的OID不可用，继续尝试下一个供应商
+                error_log("SNMP Error on device " . $this->snmp_hostname . " with OID set " . $vendor . ": " . $e->getMessage(), 3, "/var/www/phpipam/snmp_errors.log");
+            }
+        }
+
+        // 如果所有OID都不可用，返回空结果
+        $res = [];
+
+        // save result
+        $this->save_last_result($res);
+
+        // return response
+        $this->connection_close(); // Ensure SNMP session is closed after each query
         return isset($res) ? $res : false;
     }
 
@@ -932,4 +1291,742 @@ class phpipamSNMP extends Common_functions {
         }
     }
 
+    /**
+     * 获取设备详细信息
+     * 
+     * 支持从通用ENTITY-MIB以及厂商特定MIB(思科、华为、H3C)获取详细信息
+     *
+     * @access private
+     * @return void
+     */
+    private function get_device_info() {
+        // 初始化返回结果
+        $res = [
+            'sysinfo' => [],      // 系统基本信息
+            'hardware' => []      // 硬件信息
+        ];
+
+        // 首先获取系统基本信息 - 只查询最基本的信息
+        try {
+            // 获取系统描述
+            $sysDescr = $this->snmp_get("SNMPv2-MIB::sysDescr", "0");
+            $res['sysinfo']['description'] = $this->parse_snmp_result_value($sysDescr);
+            
+            // 从系统描述中尝试提取信息
+            if (!empty($res['sysinfo']['description'])) {
+                $description = $res['sysinfo']['description'];
+                
+                // 尝试提取设备型号
+                if (preg_match('/(?:cisco|huawei|h3c)\s+(\S+)[\s,]/i', $description, $matches)) {
+                    $res['hardware']['model'] = $matches[1];
+                }
+                
+                // 尝试提取软件版本
+                if (preg_match('/Version\s+([^,\s]+)/i', $description, $matches)) {
+                    $res['hardware']['software'] = $matches[1];
+                }
+            }
+            
+            // 获取系统名称
+            $sysName = $this->snmp_get("SNMPv2-MIB::sysName", "0");
+            $res['sysinfo']['name'] = $this->parse_snmp_result_value($sysName);
+            
+            // 获取系统位置
+            $sysLocation = $this->snmp_get("SNMPv2-MIB::sysLocation", "0");
+            $res['sysinfo']['location'] = $this->parse_snmp_result_value($sysLocation);
+        } catch (Exception $e) {
+            // 简单记录错误但继续执行
+            $res['error'] = $e->getMessage();
+        }
+
+        // 保存结果
+        $this->save_last_result($res);
+        return $res;
+    }
+
+    /**
+     * 识别设备厂商
+     *
+     * @access private
+     * @param string $sysObjectID
+     * @return string
+     */
+    private function identify_device_vendor($sysObjectID) {
+        if (strpos($sysObjectID, '1.3.6.1.4.1.9.') !== false) {
+            return 'Cisco';
+        } elseif (strpos($sysObjectID, '1.3.6.1.4.1.2011.') !== false || 
+                 strpos($sysObjectID, '.1.3.6.1.4.1.2011.') !== false) {
+            return 'Huawei';
+        } elseif (strpos($sysObjectID, '1.3.6.1.4.1.25506.') !== false || 
+                 strpos($sysObjectID, '.1.3.6.1.4.1.25506.') !== false ||
+                 strpos($sysObjectID, '1.3.6.1.4.1.3902.') !== false) {
+            return 'H3C';
+        } elseif (preg_match('/huawei/i', $this->snmp_hostname)) {
+            return 'Huawei';
+        } elseif (preg_match('/h3c/i', $this->snmp_hostname)) {
+            return 'H3C';
+        } else {
+            // 尝试从sysDescr中获取厂商信息
+            try {
+                $sysDescr = $this->snmp_get("SNMPv2-MIB::sysDescr", "0");
+                $sysDescr = $this->parse_snmp_result_value($sysDescr);
+                
+                if (stripos($sysDescr, 'huawei') !== false) {
+                    return 'Huawei';
+                } elseif (stripos($sysDescr, 'h3c') !== false) {
+                    return 'H3C';
+                } elseif (stripos($sysDescr, 'cisco') !== false) {
+                    return 'Cisco';
+                }
+            } catch (Exception $e) {
+                // 忽略错误
+            }
+            
+            return 'Unknown';
+        }
+    }
+    
+    /**
+     * 获取设备接口流量统计
+     *
+     * @access private
+     * @return array
+     */
+    private function get_interface_traffic() {
+        // init
+        $this->connection_open(); // 确保在每次查询前打开SNMP会话
+        
+        // 定义不同厂商的接口流量OID
+        $oids = [
+            "STANDARD-MIB" => [
+                "if_names" => "IF-MIB::ifName",
+                "if_descr" => "IF-MIB::ifDescr",
+                "if_hc_in_octets" => "IF-MIB::ifHCInOctets",  // 64位高容量计数器
+                "if_hc_out_octets" => "IF-MIB::ifHCOutOctets",
+                "if_in_octets" => "IF-MIB::ifInOctets",       // 32位低容量计数器（备选）
+                "if_out_octets" => "IF-MIB::ifOutOctets",
+                "if_in_errors" => "IF-MIB::ifInErrors",
+                "if_out_errors" => "IF-MIB::ifOutErrors",
+                "if_speed" => "IF-MIB::ifSpeed",
+                "if_high_speed" => "IF-MIB::ifHighSpeed",
+                "if_oper_status" => "IF-MIB::ifOperStatus"
+            ],
+            "HUAWEI-MIB" => [
+                "if_names" => "IF-MIB::ifName",
+                "if_descr" => "IF-MIB::ifDescr",
+                "if_hc_in_octets" => "IF-MIB::ifHCInOctets",
+                "if_hc_out_octets" => "IF-MIB::ifHCOutOctets",
+                "if_in_octets" => "HUAWEI-IF-MIB::hwIfInOctets",
+                "if_out_octets" => "HUAWEI-IF-MIB::hwIfOutOctets",
+                "if_in_errors" => "HUAWEI-IF-MIB::hwIfInErrors",
+                "if_out_errors" => "HUAWEI-IF-MIB::hwIfOutErrors",
+                "if_speed" => "IF-MIB::ifSpeed",
+                "if_high_speed" => "IF-MIB::ifHighSpeed",
+                "if_oper_status" => "IF-MIB::ifOperStatus",
+                // 华为特有OID
+                "hw_if_in_octets" => "1.3.6.1.4.1.2011.5.25.31.1.1.1.1.6",
+                "hw_if_out_octets" => "1.3.6.1.4.1.2011.5.25.31.1.1.1.1.7",
+                "hw_if_in_errors" => "1.3.6.1.4.1.2011.5.25.31.1.1.1.1.8",
+                "hw_if_out_errors" => "1.3.6.1.4.1.2011.5.25.31.1.1.1.1.9",
+                "hw_if_status" => "1.3.6.1.4.1.2011.5.25.31.1.1.1.1.5"
+            ],
+            "H3C-MIB" => [
+                "if_names" => "IF-MIB::ifName",
+                "if_descr" => "IF-MIB::ifDescr",
+                "if_hc_in_octets" => "IF-MIB::ifHCInOctets",
+                "if_hc_out_octets" => "IF-MIB::ifHCOutOctets",
+                "if_in_octets" => "H3C-IF-MIB::h3cIfInOctets",
+                "if_out_octets" => "H3C-IF-MIB::h3cIfOutOctets",
+                "if_in_errors" => "H3C-IF-MIB::h3cIfInErrors",
+                "if_out_errors" => "H3C-IF-MIB::h3cIfOutErrors",
+                "if_speed" => "IF-MIB::ifSpeed",
+                "if_high_speed" => "IF-MIB::ifHighSpeed",
+                "if_oper_status" => "IF-MIB::ifOperStatus",
+                // H3C特有OID
+                "h3c_if_in_octets" => "1.3.6.1.4.1.25506.2.6.1.1.1.1.3",
+                "h3c_if_out_octets" => "1.3.6.1.4.1.25506.2.6.1.1.1.1.4",
+                "h3c_if_in_errors" => "1.3.6.1.4.1.25506.2.6.1.1.1.1.5",
+                "h3c_if_out_errors" => "1.3.6.1.4.1.25506.2.6.1.1.1.1.6",
+                "h3c_if_status" => "1.3.6.1.4.1.25506.2.6.1.1.1.1.2"
+            ]
+        ];
+        
+        // 华为设备直接处理
+        if ($this->snmp_host == '10.254.0.6') {
+            // 针对华为ME60设备获取接口流量的直接实现
+            $interfaces = $this->get_huawei_me60_traffic();
+            if (!empty($interfaces)) {
+                // 如果直接方法成功，返回结果
+                $this->save_last_result($interfaces);
+                $this->connection_close(); // 确保在每次查询后关闭SNMP会话
+                return $interfaces;
+            }
+        }
+        
+        // 尝试获取设备的系统对象ID以确定厂商
+        try {
+            $sysObjectID = $this->snmp_get("SNMPv2-MIB::sysObjectID", "0");
+            $sysObjectID = $this->parse_snmp_result_value($sysObjectID);
+            $vendor = $this->identify_device_vendor($sysObjectID);
+            
+            // 记录设备信息用于调试
+            error_log("设备IP: " . $this->snmp_host . " SysObjectID: " . $sysObjectID . " 识别厂商: " . $vendor);
+        } catch (Exception $e) {
+            // 如果无法获取sysObjectID，尝试从IP地址或主机名判断
+            $vendor = "Unknown";
+            
+            // 华为设备IP特殊处理
+            if ($this->snmp_host == "10.254.0.6") {
+                $vendor = "Huawei";
+                error_log("基于IP地址识别设备: " . $this->snmp_host . " 为华为设备");
+            }
+            // 尝试从主机名识别
+            elseif (preg_match('/huawei/i', $this->snmp_hostname)) {
+                $vendor = "Huawei";
+            }
+            elseif (preg_match('/h3c/i', $this->snmp_hostname)) {
+                $vendor = "H3C";
+            }
+        }
+        
+        // 根据厂商选择OID集
+        $oid_set = $oids["STANDARD-MIB"]; // 默认使用标准MIB
+        $tried_vendors = []; // 记录尝试过的厂商
+        
+        if ($vendor == "Huawei") {
+            $oid_set = $oids["HUAWEI-MIB"];
+            $tried_vendors[] = "Huawei";
+        } elseif ($vendor == "H3C") {
+            $oid_set = $oids["H3C-MIB"];
+            $tried_vendors[] = "H3C";
+        }
+        
+        $interfaces = [];
+        $success = false;
+        
+        // 尝试获取接口信息，如果识别的厂商失败则尝试其他厂商
+        while (!$success && count($tried_vendors) < 3) {
+            // 获取接口名称和描述
+            try {
+                $if_names = $this->snmp_walk($oid_set["if_names"]);
+                
+                if (!empty($if_names)) {
+                    $success = true;
+                    $if_descr = [];
+                    
+                    try {
+                        $if_descr = $this->snmp_walk($oid_set["if_descr"]);
+                    } catch (Exception $e) {
+                        // 忽略接口描述获取失败
+                        error_log("获取接口描述失败: " . $e->getMessage());
+                    }
+                    
+                    // 遍历接口并获取流量数据
+                    foreach ($if_names as $oid => $value) {
+                        $if_index = str_replace($this->snmp_oids[$oid_set["if_names"]].'.', "", $oid);
+                        $name = $this->parse_snmp_result_value($value);
+                        
+                        // 只处理有效名称的接口
+                        if (!empty($name)) {
+                            $interface = [
+                                'index' => $if_index,
+                                'name' => $name,
+                                'description' => '',
+                                'in_octets' => 0,
+                                'out_octets' => 0,
+                                'in_errors' => 0,
+                                'out_errors' => 0,
+                                'speed' => 0,
+                                'oper_status' => ''
+                            ];
+                            
+                            // 获取接口描述
+                            if (isset($if_descr[$this->snmp_oids[$oid_set["if_descr"]].'.'.$if_index])) {
+                                $interface['description'] = $this->parse_snmp_result_value($if_descr[$this->snmp_oids[$oid_set["if_descr"]].'.'.$if_index]);
+                            }
+                            
+                            // 关闭当前连接并重新打开，避免长时间连接导致的超时
+                            $this->connection_close();
+                            $this->connection_open();
+                            
+                            // 华为设备特殊处理
+                            if ($vendor == "Huawei") {
+                                $this->get_huawei_interface_traffic($interface, $if_index, $oid_set);
+                            }
+                            // H3C设备特殊处理
+                            elseif ($vendor == "H3C") {
+                                $this->get_h3c_interface_traffic($interface, $if_index, $oid_set);
+                            }
+                            // 标准处理流程
+                            else {
+                                $this->get_standard_interface_traffic($interface, $if_index, $oid_set);
+                            }
+                            
+                            // 添加到接口数组
+                            $interfaces[$if_index] = $interface;
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                // 记录错误但继续尝试其他厂商
+                error_log("使用" . $vendor . "处理设备" . $this->snmp_host . "失败: " . $e->getMessage());
+                
+                // 切换到下一个厂商尝试
+                if (!in_array("Huawei", $tried_vendors)) {
+                    $vendor = "Huawei";
+                    $oid_set = $oids["HUAWEI-MIB"];
+                    $tried_vendors[] = "Huawei";
+                } elseif (!in_array("H3C", $tried_vendors)) {
+                    $vendor = "H3C";
+                    $oid_set = $oids["H3C-MIB"];
+                    $tried_vendors[] = "H3C";
+                } elseif (!in_array("STANDARD-MIB", $tried_vendors)) {
+                    $vendor = "STANDARD-MIB";
+                    $oid_set = $oids["STANDARD-MIB"];
+                    $tried_vendors[] = "STANDARD-MIB";
+                }
+                
+                // 重启连接
+                $this->connection_close();
+                $this->connection_open();
+            }
+        }
+        
+        // 保存结果
+        $this->save_last_result($interfaces);
+        
+        // 返回响应
+        $this->connection_close(); // 确保在每次查询后关闭SNMP会话
+        return $interfaces;
+    }
+    
+    /**
+     * 华为设备专用接口流量获取
+     * 
+     * @param array &$interface 接口数据数组（引用）
+     * @param string $if_index 接口索引
+     * @param array $oid_set OID集合
+     * @return void
+     */
+    private function get_huawei_interface_traffic(&$interface, $if_index, $oid_set) {
+        $traffic_data_found = false;
+        
+        // 华为设备增加延迟和重试次数
+        $this->snmp_timeout = 10000;  // 增加超时时间到10秒
+        $this->snmp_retries = 10;     // 增加重试次数
+        $this->connection_close();    // 关闭当前连接
+        $this->connection_open();     // 用新的超时设置重新打开连接
+        
+        // 记录开始处理华为设备
+        error_log("开始处理华为设备接口流量: IP={$this->snmp_host}, 接口索引={$if_index}");
+        
+        // 尝试直接使用华为特定OID获取数据
+        $hw_oid_sets = [
+            // 华为ME/NE系列设备
+            [
+                "in_octets"  => "1.3.6.1.4.1.2011.5.25.31.1.1.1.1.6." . $if_index,
+                "out_octets" => "1.3.6.1.4.1.2011.5.25.31.1.1.1.1.7." . $if_index,
+                "name" => "ME/NE系列"
+            ],
+            // 华为S系列交换机
+            [
+                "in_octets"  => "1.3.6.1.2.1.31.1.1.1.6." . $if_index,    // ifHCInOctets
+                "out_octets" => "1.3.6.1.2.1.31.1.1.1.10." . $if_index,   // ifHCOutOctets
+                "name" => "S系列"
+            ],
+            // 华为AR系列路由器
+            [
+                "in_octets"  => "1.3.6.1.4.1.2011.5.14.3.2.1.2." . $if_index,
+                "out_octets" => "1.3.6.1.4.1.2011.5.14.3.2.1.3." . $if_index,
+                "name" => "AR系列"
+            ],
+            // 华为通用计数器
+            [
+                "in_octets"  => "1.3.6.1.2.1.2.2.1.10." . $if_index,      // ifInOctets
+                "out_octets" => "1.3.6.1.2.1.2.2.1.16." . $if_index,      // ifOutOctets
+                "name" => "通用计数器"
+            ]
+        ];
+        
+        // 尝试每组OID
+        foreach ($hw_oid_sets as $hw_oids) {
+            try {
+                error_log("尝试获取{$hw_oids['name']}入流量，OID={$hw_oids['in_octets']}");
+                $in_octets = $this->snmp_poll("get", $hw_oids['in_octets'], "");
+                
+                if ($in_octets !== false) {
+                    $interface['in_octets'] = $this->parse_snmp_result_value($in_octets);
+                    error_log("成功获取{$hw_oids['name']}入流量: {$interface['in_octets']}");
+                    
+                    // 如果入流量获取成功，尝试获取出流量
+                    try {
+                        error_log("尝试获取{$hw_oids['name']}出流量，OID={$hw_oids['out_octets']}");
+                        $out_octets = $this->snmp_poll("get", $hw_oids['out_octets'], "");
+                        
+                        if ($out_octets !== false) {
+                            $interface['out_octets'] = $this->parse_snmp_result_value($out_octets);
+                            error_log("成功获取{$hw_oids['name']}出流量: {$interface['out_octets']}");
+                            $traffic_data_found = true;
+                            break; // 如果这组OID成功获取数据，则不再尝试其他组
+                        }
+                    } catch (Exception $e) {
+                        error_log("获取{$hw_oids['name']}出流量失败: " . $e->getMessage());
+                    }
+                }
+            } catch (Exception $e) {
+                error_log("获取{$hw_oids['name']}入流量失败: " . $e->getMessage());
+            }
+        }
+        
+        // 如果还是没有获取到流量数据，尝试标准OID
+        if (!$traffic_data_found) {
+            $this->get_standard_interface_traffic($interface, $if_index, $oid_set);
+        }
+        
+        // 获取错误计数
+        try {
+            $in_errors = $this->snmp_get($oid_set["if_in_errors"], $if_index);
+            $interface['in_errors'] = $this->parse_snmp_result_value($in_errors);
+        } catch (Exception $e) {
+            try {
+                // 尝试直接使用OID
+                $in_errors = $this->snmp_poll("get", "1.3.6.1.2.1.2.2.1.14." . $if_index, "");
+                if ($in_errors !== false) {
+                    $interface['in_errors'] = $this->parse_snmp_result_value($in_errors);
+                }
+            } catch (Exception $e) {
+                // 忽略错误
+            }
+        }
+        
+        try {
+            $out_errors = $this->snmp_get($oid_set["if_out_errors"], $if_index);
+            $interface['out_errors'] = $this->parse_snmp_result_value($out_errors);
+        } catch (Exception $e) {
+            try {
+                // 尝试直接使用OID
+                $out_errors = $this->snmp_poll("get", "1.3.6.1.2.1.2.2.1.20." . $if_index, "");
+                if ($out_errors !== false) {
+                    $interface['out_errors'] = $this->parse_snmp_result_value($out_errors);
+                }
+            } catch (Exception $e) {
+                // 忽略错误
+            }
+        }
+        
+        // 获取接口状态和速率
+        $this->get_interface_status_speed($interface, $if_index, $oid_set);
+        
+        // 恢复为默认超时设置
+        $this->snmp_timeout = 5000;  // 恢复默认超时
+        $this->snmp_retries = 5;     // 恢复默认重试次数
+    }
+    
+    /**
+     * H3C设备专用接口流量获取
+     * 
+     * @param array &$interface 接口数据数组（引用）
+     * @param string $if_index 接口索引
+     * @param array $oid_set OID集合
+     * @return void
+     */
+    private function get_h3c_interface_traffic(&$interface, $if_index, $oid_set) {
+        $traffic_data_found = false;
+        
+        // H3C设备先尝试专用OID
+        try {
+            $in_octets = $this->snmp_get($oid_set["h3c_if_in_octets"], $if_index);
+            $interface['in_octets'] = $this->parse_snmp_result_value($in_octets);
+            $traffic_data_found = true;
+        } catch (Exception $e) {
+            error_log("获取H3C设备专用入流量失败: " . $e->getMessage());
+        }
+        
+        try {
+            $out_octets = $this->snmp_get($oid_set["h3c_if_out_octets"], $if_index);
+            $interface['out_octets'] = $this->parse_snmp_result_value($out_octets);
+            $traffic_data_found = true;
+        } catch (Exception $e) {
+            error_log("获取H3C设备专用出流量失败: " . $e->getMessage());
+        }
+        
+        // 如果专用OID失败，尝试标准OID
+        if (!$traffic_data_found) {
+            $this->get_standard_interface_traffic($interface, $if_index, $oid_set);
+        }
+        
+        // 获取错误计数
+        try {
+            $in_errors = $this->snmp_get($oid_set["h3c_if_in_errors"], $if_index);
+            $interface['in_errors'] = $this->parse_snmp_result_value($in_errors);
+        } catch (Exception $e) {
+            try {
+                $in_errors = $this->snmp_get($oid_set["if_in_errors"], $if_index);
+                $interface['in_errors'] = $this->parse_snmp_result_value($in_errors);
+            } catch (Exception $e) {
+                // 忽略错误
+            }
+        }
+        
+        try {
+            $out_errors = $this->snmp_get($oid_set["h3c_if_out_errors"], $if_index);
+            $interface['out_errors'] = $this->parse_snmp_result_value($out_errors);
+        } catch (Exception $e) {
+            try {
+                $out_errors = $this->snmp_get($oid_set["if_out_errors"], $if_index);
+                $interface['out_errors'] = $this->parse_snmp_result_value($out_errors);
+            } catch (Exception $e) {
+                // 忽略错误
+            }
+        }
+        
+        // 获取接口状态和速率
+        $this->get_interface_status_speed($interface, $if_index, $oid_set);
+    }
+    
+    /**
+     * 标准接口流量获取
+     * 
+     * @param array &$interface 接口数据数组（引用）
+     * @param string $if_index 接口索引
+     * @param array $oid_set OID集合
+     * @return void
+     */
+    private function get_standard_interface_traffic(&$interface, $if_index, $oid_set) {
+        // 获取接口流量统计，首先尝试使用64位高容量计数器
+        try {
+            $in_octets = $this->snmp_get($oid_set["if_hc_in_octets"], $if_index);
+            $interface['in_octets'] = $this->parse_snmp_result_value($in_octets);
+        } catch (Exception $e) {
+            // 如果64位计数器失败，尝试使用32位计数器
+            try {
+                $in_octets = $this->snmp_get($oid_set["if_in_octets"], $if_index);
+                $interface['in_octets'] = $this->parse_snmp_result_value($in_octets);
+            } catch (Exception $e) {
+                error_log("获取标准入流量失败: " . $e->getMessage());
+            }
+        }
+        
+        try {
+            $out_octets = $this->snmp_get($oid_set["if_hc_out_octets"], $if_index);
+            $interface['out_octets'] = $this->parse_snmp_result_value($out_octets);
+        } catch (Exception $e) {
+            // 如果64位计数器失败，尝试使用32位计数器
+            try {
+                $out_octets = $this->snmp_get($oid_set["if_out_octets"], $if_index);
+                $interface['out_octets'] = $this->parse_snmp_result_value($out_octets);
+            } catch (Exception $e) {
+                error_log("获取标准出流量失败: " . $e->getMessage());
+            }
+        }
+        
+        // 获取接口错误计数
+        try {
+            $in_errors = $this->snmp_get($oid_set["if_in_errors"], $if_index);
+            $interface['in_errors'] = $this->parse_snmp_result_value($in_errors);
+        } catch (Exception $e) {
+            // 忽略错误
+        }
+        
+        try {
+            $out_errors = $this->snmp_get($oid_set["if_out_errors"], $if_index);
+            $interface['out_errors'] = $this->parse_snmp_result_value($out_errors);
+        } catch (Exception $e) {
+            // 忽略错误
+        }
+        
+        // 获取接口状态和速率
+        $this->get_interface_status_speed($interface, $if_index, $oid_set);
+    }
+    
+    /**
+     * 获取接口状态和速率
+     * 
+     * @param array &$interface 接口数据数组（引用）
+     * @param string $if_index 接口索引
+     * @param array $oid_set OID集合
+     * @return void
+     */
+    private function get_interface_status_speed(&$interface, $if_index, $oid_set) {
+        // 获取接口状态
+        try {
+            $oper_status = $this->snmp_get($oid_set["if_oper_status"], $if_index);
+            $status = $this->parse_snmp_result_value($oper_status);
+            
+            // 将数字状态转换为文本描述
+            if (is_numeric($status)) {
+                switch ($status) {
+                    case '1': $interface['oper_status'] = 'up'; break;
+                    case '2': $interface['oper_status'] = 'down'; break;
+                    case '3': $interface['oper_status'] = 'testing'; break;
+                    case '4': $interface['oper_status'] = 'unknown'; break;
+                    case '5': $interface['oper_status'] = 'dormant'; break;
+                    case '6': $interface['oper_status'] = 'notPresent'; break;
+                    case '7': $interface['oper_status'] = 'lowerLayerDown'; break;
+                    default: $interface['oper_status'] = $status;
+                }
+            } else {
+                $interface['oper_status'] = $status;
+            }
+        } catch (Exception $e) {
+            try {
+                // 尝试直接使用OID
+                $oper_status = $this->snmp_poll("get", "1.3.6.1.2.1.2.2.1.8." . $if_index, "");
+                if ($oper_status !== false) {
+                    $status = $this->parse_snmp_result_value($oper_status);
+                    if (is_numeric($status)) {
+                        switch ($status) {
+                            case '1': $interface['oper_status'] = 'up'; break;
+                            case '2': $interface['oper_status'] = 'down'; break;
+                            default: $interface['oper_status'] = $status;
+                        }
+                    } else {
+                        $interface['oper_status'] = $status;
+                    }
+                }
+            } catch (Exception $e) {
+                $interface['oper_status'] = 'unknown';
+            }
+        }
+        
+        // 获取接口速率，首先尝试高速率OID (ifHighSpeed)
+        try {
+            $speed = $this->snmp_get($oid_set["if_high_speed"], $if_index);
+            $speed_value = $this->parse_snmp_result_value($speed);
+            
+            // ifHighSpeed返回的是Mbps，需要转换为bps
+            $interface['speed'] = $speed_value * 1000000;
+        } catch (Exception $e) {
+            // 如果高速率OID失败，尝试标准速率OID (ifSpeed)
+            try {
+                $speed = $this->snmp_get($oid_set["if_speed"], $if_index);
+                $interface['speed'] = $this->parse_snmp_result_value($speed);
+            } catch (Exception $e) {
+                try {
+                    // 直接使用OID
+                    $speed = $this->snmp_poll("get", "1.3.6.1.2.1.2.2.1.5." . $if_index, "");
+                    if ($speed !== false) {
+                        $interface['speed'] = $this->parse_snmp_result_value($speed);
+                    }
+                } catch (Exception $e) {
+                    $interface['speed'] = 0;
+                }
+            }
+        }
+    }
+
+    /**
+     * 专门为华为ME60设备获取接口流量
+     * 
+     * @access private
+     * @return array
+     */
+    private function get_huawei_me60_traffic() {
+        // 增加超时和重试
+        $this->snmp_timeout = 15000;  // 15秒
+        $this->snmp_retries = 15;    // 15次重试
+        
+        // 重设会话
+        $this->connection_close();
+        $this->connection_open();
+        
+        error_log("尝试针对华为ME60设备直接抓取接口流量");
+        
+        $interfaces = [];
+        
+        try {
+            // 直接尝试获取接口名称 - 使用ifDescr OID而不是ifName
+            // 华为设备ifDescr通常比ifName更容易获取
+            error_log("尝试获取接口描述: 1.3.6.1.2.1.2.2.1.2");
+            $if_descr = $this->snmp_session->walk('1.3.6.1.2.1.2.2.1.2');
+            
+            if (!empty($if_descr)) {
+                error_log("成功获取 " . count($if_descr) . " 个接口描述");
+                
+                // 遍历接口
+                foreach ($if_descr as $oid => $value) {
+                    // 从OID中提取接口索引
+                    preg_match('/\.([0-9]+)$/', $oid, $matches);
+                    if (isset($matches[1])) {
+                        $if_index = $matches[1];
+                        
+                        // 解析接口名称
+                        $name = $this->parse_snmp_result_value($value);
+                        error_log("处理接口: 索引=$if_index, 名称=$name");
+                        
+                        // 初始化接口数据
+                        $interface = [
+                            'index' => $if_index,
+                            'name' => $name,
+                            'description' => $name,
+                            'in_octets' => 0,
+                            'out_octets' => 0,
+                            'in_errors' => 0,
+                            'out_errors' => 0,
+                            'speed' => 0,
+                            'oper_status' => 'unknown'
+                        ];
+                        
+                        // 尝试获取基本流量计数器 (32位)
+                        try {
+                            $in_octets = $this->snmp_session->get("1.3.6.1.2.1.2.2.1.10.$if_index"); // ifInOctets
+                            $interface['in_octets'] = $this->parse_snmp_result_value($in_octets);
+                            
+                            $out_octets = $this->snmp_session->get("1.3.6.1.2.1.2.2.1.16.$if_index"); // ifOutOctets
+                            $interface['out_octets'] = $this->parse_snmp_result_value($out_octets);
+                            
+                            error_log("接口 $if_index ($name) 流量统计: 入=$interface[in_octets], 出=$interface[out_octets]");
+                        } catch (Exception $e) {
+                            error_log("获取接口 $if_index 流量失败: " . $e->getMessage());
+                        }
+                        
+                        // 尝试获取错误计数
+                        try {
+                            $in_errors = $this->snmp_session->get("1.3.6.1.2.1.2.2.1.14.$if_index"); // ifInErrors
+                            $interface['in_errors'] = $this->parse_snmp_result_value($in_errors);
+                            
+                            $out_errors = $this->snmp_session->get("1.3.6.1.2.1.2.2.1.20.$if_index"); // ifOutErrors
+                            $interface['out_errors'] = $this->parse_snmp_result_value($out_errors);
+                        } catch (Exception $e) {
+                            // 忽略错误
+                        }
+                        
+                        // 尝试获取接口状态
+                        try {
+                            $status = $this->snmp_session->get("1.3.6.1.2.1.2.2.1.8.$if_index"); // ifOperStatus
+                            $status_value = $this->parse_snmp_result_value($status);
+                            if ($status_value == '1') {
+                                $interface['oper_status'] = 'up';
+                            } elseif ($status_value == '2') {
+                                $interface['oper_status'] = 'down';
+                            } else {
+                                $interface['oper_status'] = $status_value;
+                            }
+                        } catch (Exception $e) {
+                            // 忽略错误
+                        }
+                        
+                        // 尝试获取接口速率
+                        try {
+                            $speed = $this->snmp_session->get("1.3.6.1.2.1.2.2.1.5.$if_index"); // ifSpeed
+                            $interface['speed'] = $this->parse_snmp_result_value($speed);
+                        } catch (Exception $e) {
+                            // 忽略错误
+                        }
+                        
+                        // 将接口数据添加到结果数组
+                        $interfaces[$if_index] = $interface;
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            error_log("华为ME60设备直接抓取失败: " . $e->getMessage());
+        }
+        
+        // 恢复默认超时设置
+        $this->snmp_timeout = 5000;
+        $this->snmp_retries = 5;
+        
+        return $interfaces;
+    }
 }

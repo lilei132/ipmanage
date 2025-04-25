@@ -5,7 +5,7 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 
 	<meta name="Description" content="">
-	<meta name="title" content="phpIPAM upgrade error">
+	<meta name="title" content="IP地址管理升级错误">
 	<meta name="robots" content="noindex, nofollow">
 	<meta http-equiv="X-UA-Compatible" content="IE=9" >
 	<meta name="viewport" content="width=1024, initial-scale=0.85, user-scalable=yes">
@@ -14,7 +14,7 @@
 	<meta http-equiv="X-UA-Compatible" content="chrome=1">
 
 	<!-- title -->
-	<title>phpIPAM upgrade error</title>
+	<title>IP地址管理升级错误</title>
 
 	<!-- css -->
 	<link rel="stylesheet" type="text/css" href="../css/bootstrap/bootstrap.min.css?v=<?php print SCRIPT_PREFIX; ?>">
@@ -38,7 +38,7 @@
 <!-- page header -->
 <div id="header">
 <div class="hero-unit">
-	<a href="">phpIPAM upgrade error</a>
+	<a href="">IP地址管理升级错误</a>
 </div>
 </div>
 
@@ -51,7 +51,7 @@
 
 		<h4>1.) Define Base</h4>
 		<hr>
-		Make sure BASE directive is set for your installation. This is used to properly detect phpIPAM directory. It must be set in config.php.
+		Make sure BASE directive is set for your installation. This is used to properly detect IP地址管理 directory. It must be set in config.php.
 
 		<div class="well" style="padding:5px;margin-top:5px;">
 		Detected BASE: <?php escape_input(print str_replace("upgrade/", "", $_SERVER['REQUEST_URI']));  ?>

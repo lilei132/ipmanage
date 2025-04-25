@@ -107,10 +107,27 @@ $values = array("id"=>1,
 				"pingStatus"          =>$POST->pingStatus,
 				"scanPingPath"        =>$POST->scanPingPath,
 				"scanFPingPath"       =>$POST->scanFPingPath,
-				"scanMaxThreads"      =>$POST->scanMaxThreads
+				"scanMaxThreads"      =>$POST->scanMaxThreads,
+				//traffic
+				"trafficCollection"       =>$Admin->verify_checkbox($POST->trafficCollection),
+				"trafficCollectionInterval"=>$POST->trafficCollectionInterval,
+				"trafficHistoryDays"     =>$POST->trafficHistoryDays
 				);
 // Update linked_field indexes
 $Tools->verify_linked_field_indexes($POST->link_field);
 
 if(!$Admin->object_modify("settings", "edit", "id", $values))	{ $Result->show("danger",  _("Cannot update settings"), true); }
-else															{ $Result->show("success", _("Settings updated successfully"), true); }
+else {
+    // 更新成功
+    $Result->show("success", _("Settings updated successfully"), true);
+    
+    // 如果流量采集相关设置被更改，自动同步到cron
+    if (isset($POST->trafficCollection) || isset($POST->trafficCollectionInterval) || isset($POST->trafficHistoryDays)) {
+        // 运行同步脚本
+        $sync_script = dirname(dirname(dirname(dirname(__FILE__)))) . '/functions/scripts/traffic_sync_settings.php';
+        if (file_exists($sync_script)) {
+            // 后台执行，避免阻塞用户界面
+            exec("php $sync_script > /dev/null 2>&1 &");
+        }
+    }
+}

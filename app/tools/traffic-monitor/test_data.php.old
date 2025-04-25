@@ -1,0 +1,212 @@
+<?php
+/**
+ * 流量数据响应脚本 - 从数据库获取真实数据
+ */
+
+// 错误处理设置
+ini_set('display_errors', 0);
+error_reporting(0);
+
+// 设置响应头
+header('Content-Type: application/json');
+header('Cache-Control: no-cache, must-revalidate');
+header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+
+// 导入配置文件
+require( dirname(__FILE__) . '/../../../config.php' );
+
+// 获取参数
+$deviceId = isset($_GET['deviceId']) ? intval($_GET['deviceId']) : 1;
+$interfaceId = isset($_GET['interfaceId']) ? intval($_GET['interfaceId']) : 1;
+$timespan = isset($_GET['timespan']) ? $_GET['timespan'] : '7d'; // 默认为7天
+
+// 根据时间跨度设置查询条件
+$timeCondition = "";
+$limit = 200; // 标准化所有查询返回200个点
+
+if ($timespan == '1h') {
+    $timeCondition = "AND timestamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)";
+} else if ($timespan == '1d') {
+    $timeCondition = "AND timestamp >= DATE_SUB(NOW(), INTERVAL 1 DAY)";
+} else if ($timespan == '7d') {
+    $timeCondition = "AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+} else if ($timespan == '30d') {
+    $timeCondition = "AND timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+}
+
+try {
+    // 从配置文件中获取数据库连接信息
+    $conn = new mysqli($db['host'], $db['user'], $db['pass'], $db['name']);
+    
+    // 检查连接
+    if ($conn->connect_error) {
+        throw new Exception("数据库连接失败: " . $conn->connect_error);
+    }
+    
+    // 查询特定设备和接口的流量数据
+    $sql = "SELECT t1.* FROM port_traffic_history t1
+            INNER JOIN (
+                SELECT timestamp, MAX(id) as max_id
+                FROM port_traffic_history
+                WHERE device_id = ? AND if_index = ? $timeCondition
+                GROUP BY timestamp
+            ) t2 ON t1.timestamp = t2.timestamp AND t1.id = t2.max_id
+            ORDER BY t1.timestamp ASC LIMIT ?";
+    
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new Exception("准备查询失败: " . $conn->error);
+    }
+    
+    $stmt->bind_param("iii", $deviceId, $interfaceId, $limit);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $data = [];
+    while ($row = $result->fetch_assoc()) {
+        $data[] = $row;
+    }
+    
+    // 如果没有找到数据，尝试只查询该设备的任何接口
+    if (empty($data)) {
+        $sql = "SELECT t1.* FROM port_traffic_history t1
+                INNER JOIN (
+                    SELECT timestamp, if_index, MAX(id) as max_id
+                    FROM port_traffic_history
+                    WHERE device_id = ? $timeCondition
+                    GROUP BY timestamp, if_index
+                ) t2 ON t1.id = t2.max_id
+                ORDER BY t1.timestamp DESC LIMIT ?";
+                
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            throw new Exception("准备查询失败: " . $conn->error);
+        }
+        
+        $stmt->bind_param("ii", $deviceId, $limit);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $data[] = $row;
+        }
+    }
+    
+    $conn->close();
+    
+    // 处理查询结果
+    if (!empty($data)) {
+        $inData = [];
+        $outData = [];
+        $speed = 1000000000; // 默认速度
+        
+        // 创建关联数组以处理相同时间戳的数据
+        $timestampMap = [];
+        
+        foreach ($data as $point) {
+            if (isset($point['timestamp'])) {
+                $timestamp = strtotime($point['timestamp']) * 1000; // 转为JS时间戳(毫秒)
+                
+                // 检查该时间戳是否已存在
+                if (!isset($timestampMap[$timestamp])) {
+                    $timestampMap[$timestamp] = [
+                        'in' => isset($point['in_octets']) ? floatval($point['in_octets']) * 8 : 0,
+                        'out' => isset($point['out_octets']) ? floatval($point['out_octets']) * 8 : 0,
+                        'speed' => isset($point['speed']) && is_numeric($point['speed']) && $point['speed'] > 0 
+                                ? floatval($point['speed']) : 1000000000
+                    ];
+                }
+                // 如果已存在，取更大的速度值和最新的流量值
+                else {
+                    $timestampMap[$timestamp]['in'] = isset($point['in_octets']) ? floatval($point['in_octets']) * 8 : $timestampMap[$timestamp]['in'];
+                    $timestampMap[$timestamp]['out'] = isset($point['out_octets']) ? floatval($point['out_octets']) * 8 : $timestampMap[$timestamp]['out'];
+                    
+                    if (isset($point['speed']) && is_numeric($point['speed']) && $point['speed'] > $timestampMap[$timestamp]['speed']) {
+                        $timestampMap[$timestamp]['speed'] = floatval($point['speed']);
+                    }
+                }
+                
+                // 更新接口速度
+                if (isset($point['speed']) && is_numeric($point['speed']) && $point['speed'] > $speed) {
+                    $speed = floatval($point['speed']);
+                }
+            }
+        }
+        
+        // 过滤异常流量值 - 超过100Gbps的值被视为异常
+        $maxTrafficValue = 100000000000; // 100Gbps
+        
+        // 把关联数组转回普通数组
+        foreach ($timestampMap as $timestamp => $values) {
+            // 过滤异常值
+            $inValue = $values['in'] > $maxTrafficValue ? $maxTrafficValue : $values['in'];
+            $outValue = $values['out'] > $maxTrafficValue ? $maxTrafficValue : $values['out'];
+            
+            $inData[] = [$timestamp, $inValue];
+            $outData[] = [$timestamp, $outValue];
+        }
+        
+        // 确保数据按时间排序
+        usort($inData, function($a, $b) {
+            return $a[0] - $b[0];
+        });
+        
+        usort($outData, function($a, $b) {
+            return $a[0] - $b[0];
+        });
+        
+        // 返回数据
+        $response = [
+            'success' => true,
+            'message' => '从数据库获取流量数据成功',
+            'count' => count($data),
+            'in_data' => $inData,
+            'out_data' => $outData,
+            'speed' => $speed,
+            'deviceId' => $deviceId,
+            'interfaceId' => $interfaceId,
+            'timespan' => $timespan,
+            'data_source' => 'database'
+        ];
+        
+        echo json_encode($response);
+        exit;
+    } else {
+        // 没有找到数据
+        $response = [
+            'success' => false,
+            'message' => "没有找到设备ID=$deviceId, 接口ID=$interfaceId 的流量数据",
+            'count' => 0,
+            'in_data' => [],
+            'out_data' => [],
+            'deviceId' => $deviceId,
+            'interfaceId' => $interfaceId,
+            'timespan' => $timespan,
+            'data_source' => 'database'
+        ];
+        
+        echo json_encode($response);
+        exit;
+    }
+    
+} catch (Exception $e) {
+    // 记录错误信息
+    error_log('流量数据查询错误: ' . $e->getMessage());
+    
+    // 返回错误信息
+    $response = [
+        'success' => false,
+        'message' => '查询失败: ' . $e->getMessage(),
+        'count' => 0,
+        'in_data' => [],
+        'out_data' => [],
+        'deviceId' => $deviceId,
+        'interfaceId' => $interfaceId,
+        'timespan' => $timespan,
+        'error' => $e->getMessage(),
+        'data_source' => 'error'
+    ];
+    
+    echo json_encode($response);
+    exit;
+} 

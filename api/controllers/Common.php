@@ -713,53 +713,24 @@ class Common_api_functions {
 	 *
 	 * @access public
 	 * @param mixed $mac
-	 * @return bool
+	 * @return boolean
 	 */
 	public function validate_mac ($mac) {
-    	// first put it to common format (1)
-    	$mac = $this->reformat_mac_address ($mac);
-    	// init common class
-    	$Common = new Common_functions;
-    	// check
-    	return $Common->validate_mac ($mac);
+		// 由于我们现在使用mac字段存储院系/部门，不进行MAC地址验证，始终返回true
+		return true;
 	}
 
 	/**
-	 * Reformats MAC address to requested format
+	 * Reformat MAC address
 	 *
 	 * @access public
-	 * @param string $mac
+	 * @param mixed $mac
 	 * @param int $format (default: 1)
-	 *      1 : 00:66:23:33:55:66
-	 *      2 : 00-66-23-33-55-66
-	 *      3 : 0066.2333.5566
-	 *      4 : 006623335566
 	 * @return string
 	 */
 	public function reformat_mac_address ($mac, $format = 1) {
-    	// strip al tags first
-    	$mac = strtolower(str_replace(array(":",".","-"), "", $mac));
-    	// format 4
-    	if ($format==4) {
-        	return $mac;
-    	}
-    	// format 3
-    	if ($format==3) {
-        	$mac = str_split($mac, 4);
-        	$mac = implode(".", $mac);
-    	}
-    	// format 2
-    	elseif ($format==2) {
-        	$mac = str_split($mac, 2);
-        	$mac = implode("-", $mac);
-    	}
-    	// format 1
-    	else {
-        	$mac = str_split($mac, 2);
-        	$mac = implode(":", $mac);
-    	}
-    	// return
-    	return $mac;
+		// 由于我们现在使用mac字段存储院系/部门，不进行MAC地址格式化，直接返回原始值
+		return $mac;
 	}
 
 	/**

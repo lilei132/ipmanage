@@ -1,6 +1,7 @@
+#!/usr/bin/php
 <?php
 /**
- * phpIPAM 流量采集配置命令行工具
+ * IP地址管理 流量采集配置命令行工具
  * 
  * 用法：
  *   php traffic_config_cli.php                     # 显示当前配置
@@ -39,7 +40,7 @@ try {
 // 帮助信息
 function showHelp() {
     echo <<<HELP
-phpIPAM 流量采集配置命令行工具
+IP地址管理 流量采集配置命令行工具
 
 用法:
   php traffic_config_cli.php                     # 显示当前配置

@@ -9,6 +9,10 @@ error_reporting(0);
 
 // 设置响应类型为JSON
 header('Content-Type: application/json');
+// 添加缓存控制头，防止浏览器缓存
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 try {
     # 引入页面头部和检查用户权限
@@ -32,6 +36,7 @@ try {
     $deviceId = isset($_GET['deviceId']) ? $_GET['deviceId'] : null;
     $interfaceId = isset($_GET['interfaceId']) ? $_GET['interfaceId'] : null;
     $timespan = isset($_GET['timespan']) ? $_GET['timespan'] : '7d';
+    $noCache = isset($_GET['_']) ? $_GET['_'] : ''; // 获取防缓存参数
 
     if (!$deviceId || !$interfaceId) {
         die(json_encode(array("success" => false, "error" => _("参数不完整"))));
@@ -41,7 +46,7 @@ try {
     $Traffic = new Traffic($Database);
 
     // 增加调试日志
-    error_log("DEBUG: 尝试获取流量数据: deviceId=$deviceId, interfaceId=$interfaceId, timespan=$timespan");
+    error_log("DEBUG: 尝试获取流量数据: deviceId=$deviceId, interfaceId=$interfaceId, timespan=$timespan, noCache=$noCache");
 
     # 从数据库获取真实流量数据
     $traffic_data = $Traffic->get_interface_history($deviceId, $interfaceId, $timespan);
@@ -49,6 +54,12 @@ try {
     // 增加调试日志 - 详细记录每个数据点
     if (!empty($traffic_data)) {
         error_log("DEBUG: 获取到流量数据点详情示例:");
+        
+        // 记录时间范围
+        $first_point = $traffic_data[0];
+        $last_point = $traffic_data[count($traffic_data) - 1];
+        error_log("DEBUG: 流量数据时间范围: " . $first_point->time_point . " 至 " . $last_point->time_point);
+        
         for ($i = 0; $i < min(5, count($traffic_data)); $i++) {
             $point = $traffic_data[$i];
             error_log("DEBUG: 数据点[$i]: time=" . $point->time_point . 
@@ -70,7 +81,8 @@ try {
             "speed" => 0,
             "count" => 0,
             "raw" => true,
-            "is_test_data" => false
+            "is_test_data" => false,
+            "timestamp" => time() // 添加服务器当前时间戳
         ));
         exit;
     }
@@ -78,9 +90,19 @@ try {
     # 创建关联数组以处理相同时间戳的数据
     $timestamp_map = [];
     $linkSpeed = 0;
+    $first_timestamp = null;
+    $last_timestamp = null;
 
     foreach ($traffic_data as $point) {
         $timestamp = strtotime($point->time_point) * 1000; // 转换为JavaScript时间戳(毫秒)
+        
+        // 记录第一个和最后一个时间戳
+        if ($first_timestamp === null || $timestamp < $first_timestamp) {
+            $first_timestamp = $timestamp;
+        }
+        if ($last_timestamp === null || $timestamp > $last_timestamp) {
+            $last_timestamp = $timestamp;
+        }
         
         // 更新链路速度（使用最大的速度值）
         if (isset($point->speed) && $point->speed > $linkSpeed) {
@@ -125,6 +147,7 @@ try {
     
     // 增加调试信息
     error_log("DEBUG: 最终格式化后数据点: 入向=" . count($in_data) . ", 出向=" . count($out_data));
+    error_log("DEBUG: 数据时间范围: " . date('Y-m-d H:i:s', $first_timestamp/1000) . " 至 " . date('Y-m-d H:i:s', $last_timestamp/1000));
 
     # 返回格式化的流量数据
     echo json_encode(array(
@@ -134,7 +157,15 @@ try {
         "speed" => $linkSpeed,
         "count" => count($in_data),
         "raw" => true, // 标记数据为原始数据，前端不进行平滑处理
-        "is_test_data" => false // 明确标记非测试数据
+        "is_test_data" => false, // 明确标记非测试数据
+        "data_range" => [
+            "first_time" => $first_timestamp,
+            "last_time" => $last_timestamp,
+            "first_time_str" => date('Y-m-d H:i:s', $first_timestamp/1000),
+            "last_time_str" => date('Y-m-d H:i:s', $last_timestamp/1000)
+        ],
+        "server_time" => time(),
+        "generated_at" => date('Y-m-d H:i:s')
     ));
 } catch (Exception $e) {
     // 记录错误到日志而不是显示

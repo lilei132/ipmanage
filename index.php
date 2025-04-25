@@ -78,7 +78,7 @@ else {
         <meta name="robots" content="index, follow">
 		<?php } else { ?>
 		<meta name="robots" content="noindex, nofollow">
-		<meta name="Description" content="">
+		<meta name="Description" content="IP地址管理系统。">
 		<?php } ?>
 		<meta http-equiv="X-UA-Compatible" content="IE=9" >
 
@@ -94,7 +94,6 @@ else {
 		<link rel="search" type="application/opensearchdescription+xml" href="/?page=opensearch" title="Search <?php print $User->settings->siteTitle; ?>">
 
 		<!-- css -->
-		<link rel="shortcut icon" type="image/png" href="css/images/favicon.png?v=<?php print SCRIPT_PREFIX; ?>">
 		<link rel="stylesheet" type="text/css" href="css/bootstrap/bootstrap.min.css?v=<?php print SCRIPT_PREFIX; ?>">
 		<link rel="stylesheet" type="text/css" href="css/font-awesome/font-awesome.min.css?v=<?php print SCRIPT_PREFIX; ?>">
 		<link rel="stylesheet" type="text/css" href="css/bootstrap/bootstrap-switch.min.css?v=<?php print SCRIPT_PREFIX; ?>">
@@ -108,6 +107,25 @@ else {
 		<link rel="stylesheet" type="text/css" href="css/slider.css?v=<?php print SCRIPT_PREFIX; ?>">
 		<?php } ?>
 
+		<!-- 自定义样式，用于补偿移除header后的页面布局 -->
+		<style type="text/css">
+		.content {
+			margin-top: 0px;
+			padding-top: 10px;
+		}
+		.mainContainer {
+			margin-top: 0px;
+			padding-top: 10px;
+		}
+		.navbar {
+			margin-bottom: 0px;
+		}
+		.navbar-brand {
+			font-size: 18px;
+			font-weight: bold;
+		}
+		</style>
+
 		<!-- js -->
 		<script src="js/jquery-3.7.1.min.js?v=<?php print SCRIPT_PREFIX; ?>"></script>
 		<script src="js/jclock.jquery.js?v=<?php print SCRIPT_PREFIX; ?>"></script>
@@ -115,6 +133,7 @@ else {
 		<script src="js/login.js?v=<?php print SCRIPT_PREFIX; ?>"></script>
 		<?php } ?>
 		<script src="js/magic.js?v=<?php print SCRIPT_PREFIX; ?>"></script>
+		<script src="js/ip_details.js?v=<?php print SCRIPT_PREFIX; ?>_<?php echo time(); ?>"></script>
 		<script src="js/bootstrap.min.js?v=<?php print SCRIPT_PREFIX; ?>"></script>
 		<script src="js/bootstrap.custom.js?v=<?php print SCRIPT_PREFIX; ?>"></script>
 		<script src="js/bootstrap-switch.min.js?v=<?php print SCRIPT_PREFIX; ?>"></script>
@@ -155,6 +174,9 @@ else {
 	<!-- body -->
 	<body>
 
+	<!-- Vue mount point -->
+	<div id="app">
+
 	<!-- wrapper -->
 	<div class="wrapper">
 
@@ -184,39 +206,6 @@ else {
 
 	<!-- loader -->
 	<div class="loading"><?php print _('Loading');?>...<br><i class="fa fa-spinner fa-spin"></i></div>
-
-	<!-- header -->
-	<div class="row" id="header">
-	    <!-- logo -->
-		<div class="col-lg-3 col-md-3 col-sm-12 col-xs-12">
-	    <?php
-		if(file_exists( dirname(__FILE__)."/css/images/logo/logo.png")) {
-			// set width
-			$logo_width = isset($config['logo_width']) ? $config['logo_width'] : 220;
-	    	print "<img style='max-width:".$logo_width."px;margin:10px;margin-top:20px;' src='css/images/logo/logo.png'>";
-		}
-	    ?>
-		</div>
-		<!-- title -->
-		<div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
-			<div class="hero-pusher hidden-xs hidden-sm"></div>
-			<div class="hero-unit">
-				<a href="<?php print create_link(null); ?>"><?php print $User->settings->siteTitle; ?></a>
-				<p class="muted">
-	            <?php
-	            $title = str_replace(" / ", "<span class='divider'>/</span>", $title);
-	            $tmp = pf_explode($User->settings->siteTitle, $title);
-	            unset($tmp[0]);
-	            print implode($User->settings->siteTitle, $tmp);
-	            ?>
-	            </p>
-			</div>
-		</div>
-		<!-- usermenu -->
-		<div class="col-lg-3 col-lg-offset-0 col-md-3 col-md-offset-0 col-sm-6 col-sm-offset-6 col-xs-12 " id="user_menu">
-			<?php include('app/sections/user-menu.php'); ?>
-		</div>
-	</div>
 
 	<!-- maintenance mode -->
 	<?php
@@ -362,14 +351,11 @@ else {
 	<!-- weather prettyLinks are user, for JS! -->
 	<div id="prettyLinks" style="display:none"><?php print $User->settings->prettyLinks; ?></div>
 
-	<!-- Page footer -->
-	<div class="footer"><?php include('app/footer.php'); ?></div>
-
 	<!-- export div -->
 	<div class="exportDIV"></div>
 
+	</div> <!-- end of Vue mount point -->
 
-	<!-- end body -->
 	</body>
 	</html>
 	<?php } ?>

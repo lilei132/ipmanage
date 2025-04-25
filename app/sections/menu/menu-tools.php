@@ -144,89 +144,74 @@ $tool_items["search"] = array (
                         );
 ?>
 
-<!-- sections -->
-<ul class="nav navbar-nav sections icons">
-
+<!-- 子网菜单 -->
+<ul class="nav navbar-nav">
     <?php
-	# first item - tools or dashboard
-	if ($GET->page=="dashboard") {
+    // 添加Tools链接
+    if ($GET->page!="dashboard") {
         print "<li class='first-item'>";
-        print " <a href='".create_link()."'><i class='fa fa-dashboard'></i> "._('Dashboard')."</a>";
+        print "<a href='".create_link("tools")."'><i class='fa fa-wrench'></i> "._('Tools')."</a>";
         print "</li>";
-	}
-	else {
-
-        # dashboard
-        print "<li class='first-item'>";
-        print " <a href='".create_link("dashboard")."'><i class='fa fa-home'></i></a>";
-        print "</li>";
-
-        print "<li class='first-item'>";
-        print "<a href='".create_link("tools")."'><i class='fa fa-angle-right'></i> "._('Tools')."</a>";
-        print "</li>";
-	}
-
+    }
     ?>
 
     <li class="dropdown">
-    	<a href="#" class="dropdown-toggle" data-toggle="dropdown"><i class='fa fa-sitemap'></i> <?php print _('Subnets'); ?> <b class="caret"></b></a>
-    	<ul class="dropdown-menu">
+        <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+            <i class='fa fa-sitemap'></i> <?php print _('Subnets'); ?> <b class="caret"></b>
+        </a>
+        <ul class="dropdown-menu">
+        <?php
+        # printout
+        if($sections!==false) {
+            # all
+            print "<li>";
+            print " <a href='".create_link("subnets")."' rel='tooltip' data-placement='bottom' title='"._("Show all sections")."'>"._('All sections')."</a>";
+            print "</li>";
 
-    	<?php
-    	# printout
-    	if($sections!==false) {
-        	# all
-        	print "<li>";
-        	print " <a href='".create_link("subnets")."' rel='tooltip' data-placement='bottom' title='"._("Show all sections")."'>"._('All sections')."</a>";
-        	print "</li>";
+            print "<li class='divider'></li>";
 
-        	print "<li class='divider'></li>";
+            # loop
+            foreach($sections as $section) {
+                # check permissions for user
+                $perm = $Sections->check_permission ($User->user, $section->id);
+                if($perm > 0 ) {
+                    # print only masters!
+                    if($section->masterSection=="0" || empty($section->masterSection)) {
+                        if( ($section->name == $GET->section) || ($section->id == $GET->section) ) { print "<li class='active'>"; }
+                        else { print "<li>"; }
 
-    		# loop
-    		foreach($sections as $section) {
-    			# check permissions for user
-    			$perm = $Sections->check_permission ($User->user, $section->id);
-    			if($perm > 0 ) {
-    				# print only masters!
-    				if($section->masterSection=="0" || empty($section->masterSection)) {
-    					if( ($section->name == $GET->section) || ($section->id == $GET->section) ) 	{ print "<li class='active'>"; }
-    					else 																				{ print "<li>"; }
-
-    					print "	<a href='".create_link("subnets",$section->id)."' rel='tooltip' data-placement='bottom' title='$section->description'>$section->name</a>";
-    					print "</li>";
-    				}
-    			}
-    		}
-    	}
-    	else {
-    		print "<li><a href=''>"._("No sections available!")."</a><li>";
-    	}
-    	?>
-    	</ul>
+                        print "	<a href='".create_link("subnets",$section->id)."' rel='tooltip' data-placement='bottom' title='$section->description'>$section->name</a>";
+                        print "</li>";
+                    }
+                }
+            }
+        }
+        else {
+            print "<li><a href=''>"._("No sections available!")."</a><li>";
+        }
+        ?>
+        </ul>
     </li>
 </ul>
 
-<!-- Tools -->
-<ul class="nav navbar-nav icons">
+<!-- 工具菜单 -->
+<ul class="nav navbar-nav">
     <?php
     foreach ($tool_items as $k=>$t) {
         // active
         $active = $GET->section==$k ? "active" : "";
 
         print "<li rel='tooltip' title='"._($t['title'])."' data-placement='bottom' class='$active'>";
-        // compact menu
-        if($User->user->menuCompact=="1") {
-            print " <a href='".create_link($t['href'][0], $t['href'][1])."'><i class='hidden-xs fa $t[icon]'></i><span class='visible-xs'> <i class='fa $t[icon]'></i>"._($t['name'])."</span></a>";
-        }
-        else {
-            print " <a href='".create_link($t['href'][0], $t['href'][1])."'><i class='fa $t[icon]'></i>"._($t['name'])."</a>";
-        }
+        print " <a href='".create_link($t['href'][0], $t['href'][1])."'>";
+        print "<i class='fa $t[icon]'></i> "._($t['name'])."</a>";
         print "</li>";
     }
     ?>
 
     <!-- all tools -->
     <li class='<?php if($GET->page=="tools" && (!isset($GET->section) || is_blank($GET->section))) print "active"; ?>'>
-         <a href='<?php print create_link("tools"); ?>'><i class='fa fa-list'></i> <?php print _('All tools'); ?></a>
+        <a href='<?php print create_link("tools"); ?>'>
+            <i class='fa fa-list'></i> <?php print _('All tools'); ?>
+        </a>
     </li>
 </ul>

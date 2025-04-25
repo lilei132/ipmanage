@@ -1,0 +1,32 @@
+/* IP状态图例样式 */
+.ip_vis_legend {
+    margin-top: 10px;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+}
+
+.ip_vis_legend h5 {
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.ip_vis_legend ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ip_vis_legend li {
+    display: inline-block;
+    margin-right: 15px;
+    margin-bottom: 10px;
+}
+
+.ip_vis_legend .status {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 1px solid #ccc;
+    vertical-align: middle;
+    margin-right: 5px;
+} 

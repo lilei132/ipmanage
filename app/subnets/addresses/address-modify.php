@@ -138,33 +138,7 @@ $(".input-switch-danger").bootstrapSwitch(switch_options_danger);
 
 
 <?php if (($act=="add"||$act=="edit") && $User->settings->enableMulticast==1) { ?>
-$("input[name=ip_addr]").focusout(function() {
-    // update mac
-    $.post('app/tools/multicast-networks/create_mac.php', {ip:$(this).val()}, function(data) {
-        if (data!="False") {
-            $("input[name=mac]").val(data);
-            validate_mac ( $("input[name=ip_addr]").val(), data, $("input[name=section]").val(), $("input[name=subnetvlan]").val(), $("input[name=addressId]").val());
-        }
-    });
-});
-$("input[name=mac]").focusout(function() {
-    //validate
-    validate_mac ($("input[name=ip_addr]").val(), $(this).val(), $("input[name=section]").val(), $("input[name=subnetvlan]").val(), $("input[name=addressId]").val());
-});
-//validatemac
-function validate_mac (ip, mac, sectionId, vlanId, id) {
-    $.post('app/tools/multicast-networks/validate_mac.php', {ip:ip, mac:mac, sectionId:sectionId, vlanId:vlanId, id:id}, function(data) {
-        if (data==="True") {
-            $("input[name=mac]").parent().removeClass("has-error");
-            $('#helpBlock2').remove();
-        }
-        else {
-            $("input[name=mac]").parent().addClass("has-error");
-            if($('#helpBlock2').length)    { $("#helpBlock2").html(data); }
-            else                           { $("input[name=mac]").parent().append("<span id='helpBlock2' class='help-block'>"+data+"</span>"); }
-        }
-    });
-}
+// 已禁用MAC地址验证，现在使用MAC字段存储院系/部门
 <?php } ?>
 
 });
@@ -231,12 +205,12 @@ function validate_mac (ip, mac, sectionId, vlanId, id) {
 		$required = in_array("hostname", $required_ip_fields) ? " *" : "";
 
 		print '<tr>'. "\n";
-		print '	<td>'._('Hostname').$required.'</td>'. "\n";
+		print '	<td>'._('申请人姓名').$required.'</td>'. "\n";
 		print '	<td>'. "\n";
 		print '	<div class="input-group">';
-		print ' <input type="text" name="hostname" class="ip_addr form-control input-sm" placeholder="'._('Hostname').'" value="'. $address['hostname']. '" '.$delete.'>'. "\n";
+		print ' <input type="text" name="hostname" class="ip_addr form-control input-sm" placeholder="'._('申请人姓名').'" value="'. $address['hostname']. '" '.$delete.'>'. "\n";
 		print '	 <span class="input-group-addon">'."\n";
-		print "		<i class='fa fa-gray fa-repeat' id='refreshHostname' data-subnetId='$subnetId' rel='tooltip' data-placement='right' title='"._('Click to check for hostname')."'></i></span>";
+		print "		<i class='fa fa-gray fa-user' rel='tooltip' data-placement='right' title='"._('申请人姓名')."'></i></span>";
 		print "	</span>";
 		print "	</div>";
 		print '	</td>'. "\n";
@@ -249,13 +223,13 @@ function validate_mac (ip, mac, sectionId, vlanId, id) {
 			<?php
 			// set star if field is required
 			$required = in_array("description", $required_ip_fields) ? " *" : "";
-			print _('Description').$required;
+			print _('工号').$required;
 			?>
 		</td>
 		<td>
 			<input type="text" name="description" class="ip_addr form-control input-sm" value="<?php if(isset($address['description'])) {print $address['description'];} ?>" size="30"
 			<?php if ( $act == "delete" ) { print " readonly";} ?>
-			placeholder="<?php print _('Description'); ?>">
+			placeholder="<?php print _('工号'); ?>">
 		</td>
 	</tr>
 
@@ -268,7 +242,7 @@ function validate_mac (ip, mac, sectionId, vlanId, id) {
 		$required = in_array("mac", $required_ip_fields) ? " *" : "";
 
 		print '<tr class="text-top">'. "\n";
-		print '	<td style="padding-top:7px;">'._('MAC address').$required.'</td>'. "\n";
+		print '	<td style="padding-top:7px;">'._('院系/部门').$required.'</td>'. "\n";
 		print '	<td>'. "\n";
 
 		# multicast selection
@@ -279,19 +253,19 @@ function validate_mac (ip, mac, sectionId, vlanId, id) {
 
      		if ($User->is_admin (false)) {
         		print ' <div class="form-group '.$mcast_class.'" style="margin-bottom:0px;">';
-        		print ' <input type="text" name="mac" class="ip_addr form-control input-sm" placeholder="'._('MAC address').'" value="'. $address['mac']. '" size="30" '.$delete.'>'.$mcast_help_block;
+        		print ' <input type="text" name="mac" class="ip_addr form-control input-sm" placeholder="'._('院系/部门').'" value="'. $address['mac']. '" size="30" '.$delete.'>'.$mcast_help_block;
         		print ' </div>';
     		}
     		else {
          		print ' <div class="form-group '.$mcast_class.'" style="margin-bottom:0px;">';
-        		print ' <input type="text" name="mac" class="ip_addr form-control input-sm" placeholder="'._('MAC address').'" value="'. $address['mac']. '" size="30" '.$delete.' disabled="disabled">'.$mcast_help_block;
+        		print ' <input type="text" name="mac" class="ip_addr form-control input-sm" placeholder="'._('院系/部门').'" value="'. $address['mac']. '" size="30" '.$delete.'>'.$mcast_help_block;
         		print ' <input type="hidden" name="mac" value="'. $address['mac']. '">';
         		print ' </div>';
     		}
 		}
 		else {
         		print ' <div class="form-group" style="margin-bottom:0px;">';
-        		print ' <input type="text" name="mac" class="ip_addr form-control input-sm" placeholder="'._('MAC address').'" value="'. $address['mac']. '" size="30" '.$delete.'>'. "\n";
+        		print ' <input type="text" name="mac" class="ip_addr form-control input-sm" placeholder="'._('院系/部门').'" value="'. $address['mac']. '" size="30" '.$delete.'>'. "\n";
         		print ' </div>';
 		}
         print '	</td>'. "\n";
@@ -443,101 +417,18 @@ function validate_mac (ip, mac, sectionId, vlanId, id) {
 	if ($User->settings->enableCustomers=="1" && $User->get_module_permissions ("customers")>=User::ACCESS_R) {
 
 		print '<tr>'. "\n";
-		print '	<td>'._('Customer').'</td>'. "\n";
+		print '	<td>'._('存放地点').'</td>'. "\n";
 		print '	<td>'. "\n";
 
-		print '<select name="customer_id" class="ip_addr form-control input-sm input-xs input-w-auto" '.$delete.'>'. "\n";
-		print '<option disabled>'._('Select customer').':</option>'. "\n";
-		print '<option value="0" selected>'._('None').'</option>'. "\n";
+		// 将下拉菜单改为文本输入框
+		$customer_value = isset($address['customer_id']) ? $address['customer_id'] : "";
+		print '<input type="text" name="customer_id" class="ip_addr form-control input-sm" placeholder="'._('输入存放地点').'" value="'.$customer_value.'" '.$delete.'>'. "\n";
 
-		// fetch devices
-		$customers = $Tools->fetch_all_objects("customers", "title");
-        if ($customers!==false) {
-    		foreach($customers as $customer) {
-    			//if same
-    			if($customer->id == $address['customer_id']) 	{ print '<option value="'. $customer->id .'" selected>'. $customer->title .'</option>'. "\n"; }
-    			else 											{ print '<option value="'. $customer->id .'">'. $customer->title .'</option>'. "\n";			 }
-    		}
-		}
-		print '</select>'. "\n";
 		print '	</td>'. "\n";
 		print '</tr>'. "\n";
 	}
 
-	// owner
-	if(in_array('owner', $selected_ip_fields)) {
-
-		if(!isset($address['owner'])) {$address['owner'] = "";}
-
-		// set star if field is required
-		$required = in_array("owner", $required_ip_fields) ? " *" : "";
-
-		print '<tr>'. "\n";
-		print '	<td>'._('Owner').$required.'</td>'. "\n";
-		print '	<td>'. "\n";
-		print ' <input type="text" name="owner" class="ip_addr form-control input-sm" id="owner" placeholder="'._('IP address owner').'" value="'. $address['owner']. '" size="30" '.$delete.'>'. "\n";
-		print '	</td>'. "\n";
-		print '</tr>'. "\n";
-	}
-
-	// switch / port
-	if(!isset($address['switch']))  {$address['switch'] = "";}
-	if(!isset($address['port'])) 	{$address['port'] = "";}
-
-	# both are active
-	if(in_array('switch', $selected_ip_fields) && $User->get_module_permissions ("devices")>=User::ACCESS_R) {
-
-		// set star if field is required
-		$required = in_array("switch", $required_ip_fields) ? " *" : "";
-
-		print '<tr>'. "\n";
-		print '	<td>'._('Device').$required.'</td>'. "\n";
-		print '	<td>'. "\n";
-
-		print '<select name="switch" class="ip_addr form-control input-sm input-w-auto" '.$delete.'>'. "\n";
-		print '<option disabled>'._('Select device').':</option>'. "\n";
-		if($required=="")
-		print '<option value="0" selected>'._('None').'</option>'. "\n";
-
-		// fetch devices
-		$devices = $Tools->fetch_all_objects("devices", "hostname");
-        if ($devices!==false) {
-    		foreach($devices as $device) {
-    			$device = (array) $device;
-    			//check if permitted in this section!
-    			$sections=pf_explode(";", $device['sections']);
-    			if(in_array($subnet['sectionId'], $sections)) {
-    			//if same
-    			if($device['id'] == $address['switch']) { print '<option value="'. $device['id'] .'" selected>'. $device['hostname'] .'</option>'. "\n"; }
-    			else 									{ print '<option value="'. $device['id'] .'">'. $device['hostname'] .'</option>'. "\n";			 }
-    			}
-    		}
-		}
-		print '</select>'. "\n";
-		print '	</td>'. "\n";
-		print '</tr>'. "\n";
-	}
-
-
-
-	# Port
-	if(in_array('port', $selected_ip_fields)) {
-
-		if(!isset($address['port'])) {$address['port'] = "";}
-
-		// set star if field is required
-		$required = in_array("port", $required_ip_fields) ? " *" : "";
-
-		print '<tr>'. "\n";
-		print '	<td>'._('Port').$required.'</td>'. "\n";
-		print '	<td>'. "\n";
-		print ' <input type="text" name="port"  class="ip_addr form-control input-sm input-w-150"  id="port"   placeholder="'._('Port').'"   value="'. $address['port']. '" size="30" '.$delete.'>'. "\n";
-		print '	</td>'. "\n";
-		print '</tr>'. "\n";
-	}
-
-
-    // location
+	// location
     if($User->settings->enableLocations=="1" && $User->get_module_permissions ("locations")>=User::ACCESS_R) { ?>
 	<tr>
 		<td>

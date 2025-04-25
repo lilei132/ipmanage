@@ -62,7 +62,16 @@ if(is_array($required_ip_fields) && $action!="delete") {
 	// Check that all required fields are present
 	foreach ($required_ip_fields as $required_field) {
 		if (!isset($POST->{$required_field}) || is_blank($POST->{$required_field})) {
-			$required_field_errors[] = ucwords($required_field)." "._("is required");
+			// Map English field names to Chinese field names
+			$field_name_map = [
+				'hostname' => '申请人姓名',
+				'description' => '工号',
+				'mac' => '院系/部门',
+				'customer_id' => '存放地点',
+			];
+			
+			$display_name = isset($field_name_map[$required_field]) ? $field_name_map[$required_field] : ucwords($required_field);
+			$required_field_errors[] = $display_name." "._("is required");
 		}
 	}
 	// check
@@ -206,25 +215,15 @@ if (!is_blank(strstr($POST->ip_addr,"-"))) {
             }
 
     	    # multicast check
-    	    if ($User->settings->enableMulticast==1) {
-        	    if ($Subnets->is_multicast ($POST->ip_addr)) {
-            	    if (!$User->is_admin(false)) {
-                	    $mtest = $Subnets->validate_multicast_mac ($POST->mac, $subnet['sectionId'], $subnet['vlanId'], MCUNIQUE);
-                	    if ($mtest !== true)                                                        { $Result->show("danger", _($mtest), true); }
-            	    }
-        	    }
+    	    if ($User->settings->enableMulticast==1 && $subnet_is_multicast) {
+    	    // 跳过多播MAC验证，因为我们现在使用MAC字段存储院系/部门
     	    }
 
         	# validate and normalize MAC address
         	if($action!=="delete") {
             	if(!is_blank($POST->mac)) {
-                	if($User->validate_mac ($POST->mac)===false) {
-                    	$errors[] = _('Invalid MAC address')."!";
-                	}
-                	// normalize
-                	else {
-                    	$POST->mac = $User->reformat_mac_address ($POST->mac, 1);
-                	}
+            		$POST->mac = trim($POST->mac);
+            		// MAC地址字段现在存储院系/部门，不需要验证MAC格式
             	}
         	}
 
@@ -282,13 +281,6 @@ else {
 	if($action!=="delete") {
     	if(!is_blank($POST->mac)) {
     		$POST->mac = trim($POST->mac);
-        	if($User->validate_mac ($POST->mac)===false) {
-            	$Result->show("danger", _('Invalid MAC address')."!", true);
-        	}
-        	// normalize
-        	else {
-            	$POST->mac = $User->reformat_mac_address ($POST->mac, 1);
-        	}
     	}
 	}
 
@@ -321,10 +313,7 @@ else {
 	    }
 	    # multicast check
 	    if ($User->settings->enableMulticast==1 && $subnet_is_multicast) {
-    	    if (!$User->is_admin(false)) {
-        	    $mtest = $Subnets->validate_multicast_mac ($POST->mac, $subnet['sectionId'], $subnet['vlanId'], MCUNIQUE);
-        	    if ($mtest !== true)                                                        { $Result->show("danger", _($mtest), true); }
-    	    }
+    	    // 跳过多播MAC验证，因为我们现在使用MAC字段存储院系/部门
 	    }
 
 	    # for delete actions check if delete was confirmed

@@ -1,77 +1,67 @@
 <?php
 /**
- * phpIPAM 流量收集配置文件
+ * IP地址管理 流量收集配置文件
  *
  * 本文件用于配置流量收集的参数和相关设置
  */
 
-// 获取phpIPAM主系统的配置
+// 获取IP地址管理主系统的配置
 function get_phpipam_settings() {
     try {
-        // 引入phpIPAM配置文件
-        $config_file = dirname(__FILE__) . '/../../config.php';
+        // 引入IP地址管理配置文件
+        $config_file = dirname(dirname(dirname(__FILE__))) . '/config.php';
         if (!file_exists($config_file)) {
-            error_log("phpIPAM配置文件不存在: $config_file");
-            return null;
+            error_log("IP地址管理配置文件不存在: $config_file");
+            return false;
         }
         
-        // 使用匿名函数避免命名冲突
-        $get_db_config = function($file) {
-            // 使用include来读取配置，变量会被加载到当前作用域
-            include($file);
-            // 如果$db变量存在就返回它
-            if (isset($db) && is_array($db)) {
-                return $db;
-            }
-            return null;
-        };
-        
-        // 获取数据库配置
-        $db_config = $get_db_config($config_file);
-        if (!$db_config) {
-            error_log("phpIPAM配置文件中没有找到数据库配置");
-            return null;
+        // 检查是否定义了数据库连接信息
+        global $db;
+        if (!isset($db) || !is_array($db)) {
+            include($config_file);
         }
         
-        // 创建临时PDO连接
-        $dsn = 'mysql:host='. $db_config['host'] .';dbname='. $db_config['name'] .';charset=utf8';
-        $pdo = new PDO($dsn, $db_config['user'], $db_config['pass']);
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        // 如果仍然没有数据库信息，返回失败
+        if (!isset($db) || !is_array($db)) {
+            error_log("IP地址管理配置文件中没有找到数据库配置");
+            return false;
+        }
         
-        // 查询系统设置
-        $query = "SELECT * FROM `settings` WHERE `id` = 1";
+        // 创建数据库连接并查询设置
+        $pdo = new PDO('mysql:host='.$db['host'].';dbname='.$db['name'].';charset=utf8', $db['user'], $db['pass'], array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
+        $query = "SELECT * FROM settings WHERE id = 1";
         $stmt = $pdo->prepare($query);
         $stmt->execute();
         $settings = $stmt->fetch(PDO::FETCH_OBJ);
         
         return $settings;
     } catch (Exception $e) {
-        error_log("无法读取phpIPAM设置: " . $e->getMessage());
-        return null;
+        error_log("无法读取IP地址管理设置: " . $e->getMessage());
+        return false;
     }
 }
 
-// 获取phpIPAM系统设置
+// 获取IP地址管理系统设置
 $phpipam_settings = get_phpipam_settings();
 
-// 如果成功获取到phpIPAM设置，使用这些设置
+// 如果成功获取到IP地址管理设置，使用这些设置
 if ($phpipam_settings) {
-    // 计算基于phpIPAM设置的采集间隔（转换为分钟）
+    // 计算基于IP地址管理设置的采集间隔（转换为分钟）
     $collection_interval = $phpipam_settings->trafficCollectionInterval / 60;
-    // 获取数据保留天数
+    // 数据保留天数
     $data_retention_days = $phpipam_settings->trafficHistoryDays;
 } else {
-    // 使用默认值
-    $collection_interval = 5;
-    $data_retention_days = 30;
+    // 默认设置
+    $collection_interval = 5; // 默认5分钟
+    $data_retention_days = 30; // 默认保留30天
 }
 
 // 基本配置
 $traffic_config = [
-    // 数据保留时间（天）- 从phpIPAM设置读取
+    // 数据保留时间（天）- 从IP地址管理设置读取
     'data_retention_days' => $data_retention_days,
     
-    // 收集频率（分钟）- 从phpIPAM设置读取
+    // 收集频率（分钟）- 从IP地址管理设置读取
     'collection_interval' => $collection_interval,
     
     // 日志级别：0=关闭，1=错误，2=警告，3=信息，4=调试
@@ -79,6 +69,21 @@ $traffic_config = [
     
     // 是否显示详细日志
     'verbose_logging' => true,
+    
+    // 日志格式：text=文本格式，json=JSON格式
+    'log_format' => 'text',
+    
+    // 日志文件模式：daily=按天，hourly=按小时，single=单文件
+    'log_file_pattern' => 'daily',
+    
+    // 最大日志文件大小（字节）
+    'max_log_size' => 10 * 1024 * 1024,  // 10MB
+    
+    // 最大保留日志文件数
+    'max_log_files' => 30,
+    
+    // 是否压缩旧日志文件
+    'compress_logs' => true,
     
     // 接口数据收集相关配置
     'interface' => [
@@ -180,24 +185,11 @@ $traffic_config = [
 function get_traffic_config($key, $default = null) {
     global $traffic_config;
     
-    // 如果未指定键名，返回整个配置
-    if (empty($key)) {
-        return $traffic_config;
+    if (isset($traffic_config[$key])) {
+        return $traffic_config[$key];
     }
     
-    // 分解键名
-    $keys = explode('.', $key);
-    $value = $traffic_config;
-    
-    // 逐级查找配置值
-    foreach ($keys as $k) {
-        if (!isset($value[$k])) {
-            return $default;
-        }
-        $value = $value[$k];
-    }
-    
-    return $value;
+    return $default;
 }
 
 /**

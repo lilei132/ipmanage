@@ -370,12 +370,13 @@ $(document).ready(function() {
         
         // 从API加载数据
         $.ajax({
-            url: '/app/tools/traffic-monitor/test_data.php',
+            url: '/app/tools/traffic-monitor/ajax_get_traffic.php',
             method: 'GET',
             data: {
                 deviceId: card.deviceId,
                 interfaceId: card.interfaceId,
-                timespan: card.timespan || '1d'
+                timespan: card.timespan || '1d',
+                _: new Date().getTime() // 添加时间戳防止缓存
             },
             dataType: 'json',
             cache: false,
@@ -396,16 +397,51 @@ $(document).ready(function() {
                         $('.out-traffic-' + index).text(formatBits(outData[outData.length - 1][1]));
                     }
                     
-                    // 更新时间
-                    const now = new Date();
-                    $('.time-' + index).text(now.getHours() + ':' + 
-                        (now.getMinutes() < 10 ? '0' : '') + now.getMinutes());
+                    // 更新时间 - 使用服务器返回的时间范围或当前时间
+                    let timeText = '';
+                    if (response.data_range && response.data_range.last_time_str) {
+                        // 直接使用服务器返回的格式化时间
+                        const lastTimeStr = response.data_range.last_time_str;
+                        // 将服务器格式 YYYY-MM-DD HH:MM:SS 转换为小部件格式 MM-DD HH:MM
+                        const parts = lastTimeStr.split(' ');
+                        if (parts.length === 2) {
+                            const dateParts = parts[0].split('-');
+                            const timeParts = parts[1].split(':');
+                            if (dateParts.length === 3 && timeParts.length >= 2) {
+                                timeText = dateParts[1] + '-' + dateParts[2] + ' ' + 
+                                           timeParts[0] + ':' + timeParts[1];
+                            } else {
+                                timeText = lastTimeStr;
+                            }
+                        } else {
+                            timeText = lastTimeStr;
+                        }
+                    } else {
+                        // 使用当前时间作为备选
+                        const now = new Date();
+                        timeText = (now.getMonth() + 1) + '-' + now.getDate() + ' ' + 
+                                   now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+                    }
+                    $('.time-' + index).text(timeText);
                 } else {
-                    $chartContainer.html('<div class="alert alert-warning" style="margin:0;padding:5px;font-size:12px;">Error loading data</div>');
+                    // 查询失败，显示错误信息
+                    const errorMsg = response.error || '获取数据失败';
+                    $chartContainer.html('<div class="alert alert-warning" style="margin:0;padding:5px;font-size:12px;">' + errorMsg + '</div>');
+                    
+                    // 清空统计数据
+                    $('.in-traffic-' + index).text('- bps');
+                    $('.out-traffic-' + index).text('- bps');
+                    $('.time-' + index).text('无数据');
                 }
             },
-            error: function() {
-                $chartContainer.html('<div class="alert alert-danger" style="margin:0;padding:5px;font-size:12px;">Request failed</div>');
+            error: function(xhr, status, error) {
+                // 请求失败
+                $chartContainer.html('<div class="alert alert-danger" style="margin:0;padding:5px;font-size:12px;">请求失败: ' + (error || status) + '</div>');
+                
+                // 清空统计数据
+                $('.in-traffic-' + index).text('- bps');
+                $('.out-traffic-' + index).text('- bps');
+                $('.time-' + index).text('请求错误');
             }
         });
     }
@@ -484,6 +520,27 @@ $(document).ready(function() {
         // 绘制背景
         ctx.fillStyle = '#f9f9f9';
         ctx.fillRect(margin.left, margin.top, chartWidth, chartHeight);
+        
+        // 绘制网格线（简化版）
+        ctx.beginPath();
+        ctx.strokeStyle = '#eeeeee';
+        ctx.lineWidth = 0.5;
+        
+        // 水平网格线（3条）
+        for (let i = 1; i <= 3; i++) {
+            const y = margin.top + (chartHeight / 3) * i;
+            ctx.moveTo(margin.left, y);
+            ctx.lineTo(margin.left + chartWidth, y);
+        }
+        
+        // 垂直网格线（3条）
+        for (let i = 1; i <= 3; i++) {
+            const x = margin.left + (chartWidth / 3) * i;
+            ctx.moveTo(x, margin.top);
+            ctx.lineTo(x, margin.top + chartHeight);
+        }
+        
+        ctx.stroke();
         
         // 绘制入流量线
         ctx.beginPath();

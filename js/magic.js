@@ -1,4 +1,3 @@
-
 /**
  *
  * Javascript / jQuery functions
@@ -672,6 +671,41 @@ $(document).on("click", ".ping_ipaddress", function() {
         showPopup('popup_w400', false, true);
         hideSpinner();
     }).fail(function(jqxhr, textStatus, errorThrown) { showError(jqxhr.statusText + "<br>Status: " + textStatus + "<br>Error: "+errorThrown); });   return false;
+});
+
+//ip details - using similar approach to ping_ipaddress
+/* 已由 ip_details.js 替代，请勿修改此注释行，此行用于标记已移除的代码 */
+
+// 关闭详情弹窗
+$(document).on('click', '.hidePopup2, .hideIpDetails', function() {
+    hidePopup2();
+    return false;
+});
+
+//specifc ip details handler for address table
+/* 已由 ip_details.js 替代，请勿修改此注释行，此行用于标记已移除的代码 */
+
+//copy ip details
+$(document).on("click", ".copy-details", function() {
+    var content = $("#ip-details-content").text();
+    // Create temporary textarea
+    var textarea = document.createElement('textarea');
+    textarea.value = content;
+    document.body.appendChild(textarea);
+    textarea.select();
+    
+    try {
+        document.execCommand('copy');
+        $(this).html('<i class="fa fa-check"></i> 已复制');
+        setTimeout(function(){
+            $(".copy-details").html('<i class="fa fa-copy"></i> 复制');
+        }, 2000);
+    } catch (err) {
+        console.error('Copy failed');
+    }
+    
+    document.body.removeChild(textarea);
+    return false;
 });
 
 
@@ -2948,4 +2982,82 @@ $('table#manageSubnets').on('click','button.add_folder', function() {
 });
 
 return false;
+});
+
+/* @subnet functions ---------- */
+$(document).on("click", "table .subnet_details", function() {
+    open_popup("subnets", "subnet-details", {subnetId:$(this).attr('data-subnetId')} );
+    return false;
+});
+/* @show IP details ---------- */
+$(document).on("click", ".ip_details", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    showSpinner();
+    var id       = $(this).attr('data-id');
+    var subnetId = $(this).attr('data-subnetId');
+    
+    // 检查是否已存在弹窗容器，如果不存在则创建
+    if ($('#popupOverlay2').length === 0) {
+        $('body').append('<div id="popupOverlay2"><div class="popup_w400"></div></div>');
+    }
+    
+    //fetch details
+    $.post('app/subnets/addresses/ip-details-popup.php', {id:id, subnetId:subnetId}, function(data) {
+        $('#popupOverlay2 div.popup_w400').html(data);
+        showPopup('popup_w400', false, true);
+        hideSpinner();
+    }).fail(function(jqxhr, textStatus, errorThrown) { 
+        showError(jqxhr.statusText + "<br>Status: " + textStatus + "<br>Error: "+errorThrown); 
+        hideSpinner();
+    });   
+    return false;
+});
+
+//specifc ip details handler for address table
+$(document).on("click", "a.ip_details", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    showSpinner();
+    var id       = $(this).attr('data-id');
+    var subnetId = $(this).attr('data-subnetId');
+    
+    // 检查是否已存在弹窗容器，如果不存在则创建
+    if ($('#popupOverlay2').length === 0) {
+        $('body').append('<div id="popupOverlay2"><div class="popup_w400"></div></div>');
+    }
+    
+    //fetch details
+    $.post('app/subnets/addresses/ip-details-popup.php', {id:id, subnetId:subnetId}, function(data) {
+        $('#popupOverlay2 div.popup_w400').html(data);
+        showPopup('popup_w400', false, true);
+        hideSpinner();
+    }).fail(function(jqxhr, textStatus, errorThrown) { 
+        showError(jqxhr.statusText + "<br>Status: " + textStatus + "<br>Error: "+errorThrown); 
+        hideSpinner();
+    });
+    return false;
+});
+
+// 复制IP详情
+$(document).on("click", ".copy-details", function() {
+    var content = $("#ip-details-content").text();
+    // 创建临时文本区域
+    var textarea = document.createElement('textarea');
+    textarea.value = content;
+    document.body.appendChild(textarea);
+    textarea.select();
+    
+    try {
+        document.execCommand('copy');
+        $(this).html('<i class="fa fa-check"></i> 已复制');
+        setTimeout(function(){
+            $(".copy-details").html('<i class="fa fa-copy"></i> 复制');
+        }, 2000);
+    } catch (err) {
+        console.error('复制失败');
+    }
+    
+    document.body.removeChild(textarea);
+    return false;
 });

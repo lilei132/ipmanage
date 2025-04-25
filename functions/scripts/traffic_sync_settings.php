@@ -1,54 +1,58 @@
+#!/usr/bin/php
 <?php
 /**
  * 流量收集设置同步脚本
  * 
- * 从phpIPAM系统设置同步到流量采集cron任务
+ * 从IP地址管理系统设置同步到流量采集cron任务
  */
 
-// 引入配置文件获取phpIPAM设置
+// 引入配置文件获取IP地址管理设置
 require_once(dirname(__FILE__) . '/traffic_config.php');
 
 // 脚本路径
 $SCRIPT_PATH = dirname(__FILE__);
 $CRON_SCRIPT = $SCRIPT_PATH . '/traffic_cron.php';
 
-// 从phpIPAM获取当前设置
+// 目标crontab文件
+$crontab_file = '/etc/cron.d/traffic_collector';
+
+// 从IP地址管理获取当前设置
 $phpipam_settings = get_phpipam_settings();
 
 if (!$phpipam_settings) {
-    error_log("无法读取phpIPAM设置，同步失败");
+    error_log("无法读取IP地址管理设置，同步失败");
     exit(1);
 }
 
-// 转换秒到分钟
+// 提取设置
 $interval_minutes = intval($phpipam_settings->trafficCollectionInterval / 60);
-if ($interval_minutes < 1) $interval_minutes = 5; // 防止除零
+$is_enabled = $phpipam_settings->trafficCollection == 1;
 
-// 检查phpIPAM的流量采集是否启用
-if ($phpipam_settings->trafficCollection == 1) {
-    // 流量采集已启用，更新cron
-    echo "phpIPAM流量采集已启用，采集间隔: $interval_minutes 分钟\n";
+// 检查IP地址管理的流量采集是否启用
+if ($is_enabled) {
+    // 准备crontab内容
+    $cron_content = "# IP地址管理 流量采集定时任务 - 由系统自动生成\n";
+    $cron_content .= "# 每 $interval_minutes 分钟执行一次\n";
+    $cron_content .= "*/$interval_minutes * * * * root php " . dirname(__FILE__) . "/traffic_collector.php > /dev/null 2>&1\n";
     
-    // 更新收集器cron任务 - 通过命令行
-    echo "正在更新流量采集cron任务...\n";
-    exec("php $CRON_SCRIPT install-collector $interval_minutes 2>&1", $output, $return_var);
-    echo implode("\n", $output) . "\n";
+    echo "IP地址管理流量采集已启用，采集间隔: $interval_minutes 分钟\n";
+    echo "更新crontab文件: $crontab_file\n";
     
-    // 确保维护任务也已安装
-    echo "正在确保数据维护cron任务已安装...\n";
-    exec("php $CRON_SCRIPT install-maintenance 2>&1", $output2, $return_var2);
-    echo implode("\n", $output2) . "\n";
+    // 写入crontab文件
+    file_put_contents($crontab_file, $cron_content);
     
-    echo "流量设置同步完成\n";
+    // 设置权限
+    chmod($crontab_file, 0644);
+    
+    echo "crontab文件已更新成功\n";
 } else {
-    // 流量采集已禁用，移除cron
-    echo "phpIPAM流量采集已禁用，移除相关cron任务\n";
-    
-    // 移除cron任务 - 通过命令行
-    exec("php $CRON_SCRIPT remove 2>&1", $output, $return_var);
-    echo implode("\n", $output) . "\n";
-    
-    echo "流量设置同步完成\n";
+    // 如果流量采集被禁用，删除crontab文件
+    if (file_exists($crontab_file)) {
+        unlink($crontab_file);
+        echo "IP地址管理流量采集已禁用，移除相关cron任务\n";
+    } else {
+        echo "IP地址管理流量采集已禁用，无需变更\n";
+    }
 }
 
 exit(0); 

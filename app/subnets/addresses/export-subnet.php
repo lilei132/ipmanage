@@ -144,6 +144,10 @@ if( (isset($GET->location)) && ($GET->location == "on") ) {
 	$worksheet->write($lineCount, $rowCount, _('location') ,$format_title);
 	$rowCount++;
 }
+if( (isset($GET->customer_id)) && ($GET->customer_id == "on") ) {
+	$worksheet->write($lineCount, $rowCount, _('存放地点') ,$format_title);
+	$rowCount++;
+}
 
 //custom
 if(sizeof($custom_fields) > 0) {
@@ -243,6 +247,10 @@ foreach ($addresses as $ip) {
 	}
 	if( (isset($GET->location)) && ($GET->location == "on") ) {
 		$worksheet->write($lineCount, $rowCount, $ip['location']);
+		$rowCount++;
+	}
+	if( (isset($GET->customer_id)) && ($GET->customer_id == "on") ) {
+		$worksheet->write($lineCount, $rowCount, $ip['customer_id']);
 		$rowCount++;
 	}
 

@@ -60,7 +60,7 @@ if(sizeof($address)>1) {
         # mac
         if(in_array('mac', $selected_ip_fields)) {
         print "<tr>";
-        print " <th>"._('MAC address')."</th>";
+        print " <th>"._('院系/部门')."</th>";
         print " <td>$address[mac]</td>";
         print "</tr>";
         }
@@ -87,7 +87,7 @@ if(sizeof($address)>1) {
 
     	# description
     	print "<tr>";
-    	print "	<th>"._('Description')."</th>";
+    	print "	<th>"._('工号')."</th>";
     	print "	<td>$address[description]</td>";
     	print "</tr>";
 
@@ -95,7 +95,7 @@ if(sizeof($address)>1) {
     	$resolve1['name'] = is_blank($resolve['name']) ? "<span class='text-muted'>/</span>" : $resolve['name'];
 
     	print "<tr>";
-    	print "	<th>"._('Hostname')."</th>";
+    	print "	<th>"._('申请人姓名')."</th>";
     	print "	<td>$resolve1[name]</td>";
     	print "</tr>";
 
@@ -119,11 +119,11 @@ if(sizeof($address)>1) {
         if($User->settings->enableCustomers=="1" && $User->get_module_permissions ("customers")>=User::ACCESS_R) {
         $customer= $Tools->fetch_object ("customers", "id", $address['customer_id']);
         print "<tr>";
-        print " <th>"._('Customer')."</th>";
+        print " <th>"._('存放地点')."</th>";
         if($customer!==false)
         print " <td>$customer->title <a target='_blank' href='".create_link("tools","customers",$customer->title)."'><i class='fa fa-external-link'></i></a></td>";
         else
-        print " <td>"._("None")."</td>";
+        print " <td>"._("无")."</td>";
         print "</tr>";
         }
 

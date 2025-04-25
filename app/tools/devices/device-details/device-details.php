@@ -22,6 +22,10 @@ $custom_fields = $Tools->fetch_custom_fields('devices');
 print "<h4>"._('Device details')."</h4>";
 print "<hr>";
 
+// 添加所需的JS库引用
+print "<script src='js/flot/jquery.flot.js'></script>";
+print "<script src='js/flot/jquery.flot.categories.js'></script>";
+
 # print
 if($GET->subnetId!=0 && sizeof($device)>0) {
 
@@ -233,10 +237,6 @@ if($GET->subnetId!=0 && sizeof($device)>0) {
         print "</tr>";
         }
 
-    	print "<tr>";
-    	print "	<td colspan='2'><hr></td>";
-    	print "</tr>";
-
 
     	if(sizeof($custom_fields) > 0) {
     		foreach($custom_fields as $field) {
@@ -303,3 +303,40 @@ if($GET->subnetId!=0 && sizeof($device)>0) {
 else {
     $Result->show("danger", _('Invalid ID'), false);
 }
+
+/**
+ * Format traffic speed with proper unit for display
+ *
+ * @param int $speed
+ * @return string
+ */
+function formatTrafficSpeed($speed) {
+    if ($speed >= 1000000000) {
+        return round($speed / 1000000000, 2) . ' Gbps';
+    } elseif ($speed >= 1000000) {
+        return round($speed / 1000000, 2) . ' Mbps';
+    } elseif ($speed >= 1000) {
+        return round($speed / 1000, 2) . ' Kbps';
+    } else {
+        return $speed . ' bps';
+    }
+}
+
+/**
+ * Format traffic value with proper unit for display
+ *
+ * @param int $value
+ * @return string
+ */
+function formatTrafficValue($value) {
+    if ($value >= 1000000000) {
+        return round($value / 1000000000, 2) . ' GB';
+    } elseif ($value >= 1000000) {
+        return round($value / 1000000, 2) . ' MB';
+    } elseif ($value >= 1000) {
+        return round($value / 1000, 2) . ' KB';
+    } else {
+        return $value . ' B';
+    }
+}
+?>

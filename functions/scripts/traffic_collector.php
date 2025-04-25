@@ -1,7 +1,8 @@
+#!/usr/bin/php
 <?php
 
 /**
- * phpIPAM 网络设备流量采集脚本
+ * IP地址管理 网络设备流量采集脚本
  *
  * 功能：
  * - 从数据库读取网络设备信息并通过SNMP采集接口流量数据
@@ -12,6 +13,9 @@
  *
  * @author 优化版本
  */
+
+// 启用tick，用于超时检测
+declare(ticks = 10);
 
 // 脚本运行开始时间
 $scriptStartTime = microtime(true);
@@ -27,6 +31,43 @@ ini_set('display_errors', 1);
 // 引入phpIPAM核心函数
 require_once dirname(__FILE__) . '/../functions.php';
 
+// 全局超时设置
+define('DEVICE_TIMEOUT', 300); // 5分钟
+define('GLOBAL_TIMEOUT', 1800); // 30分钟
+
+// 记录脚本开始时间
+$scriptGlobalStart = time();
+
+// 如果没有pcntl扩展，使用替代的超时机制
+function checkTimeout($startTime, $timeout, $message) {
+    if (time() - $startTime > $timeout) {
+        logMessage($message, 2);
+        return true;
+    }
+    return false;
+}
+
+// 设置SNMP操作超时处理函数
+function setupTimeoutHandler() {
+    // 仅在有pcntl扩展时使用
+    if (function_exists('pcntl_signal')) {
+        // 注册一个闹钟信号处理器
+        pcntl_signal(SIGALRM, function() {
+            logMessage("警告：SNMP操作超时，强制继续执行", 2);
+            pcntl_alarm(0); // 取消闹钟
+        }, true); // 添加true标志，表示可重启系统调用
+        
+        // 安装SIGTERM处理器(用于优雅退出)
+        pcntl_signal(SIGTERM, function() {
+            logMessage("接收到终止信号，正在优雅退出...", 2);
+            exit(0);
+        });
+        
+        return true;
+    }
+    return false;
+}
+
 // 加载配置和SNMP模块
 require_once dirname(__FILE__) . '/traffic_config.php';
 require_once dirname(__FILE__) . '/traffic_snmp.php';
@@ -38,10 +79,19 @@ $common = new Common_functions;
 // 初始化日志
 logMessage("流量采集脚本开始执行", 3);
 
+// 设置超时处理
+$pcntlEnabled = false;
+if (function_exists('pcntl_signal')) {
+    $pcntlEnabled = setupTimeoutHandler();
+    logMessage("已启用SNMP操作超时保护（pcntl）", 3);
+} else {
+    logMessage("警告：未启用pcntl扩展，使用替代超时保护机制", 2);
+}
+
 // 输出当前配置信息
 $collectInterval = get_traffic_config('collection_interval', 5);
 $retentionDays = get_traffic_config('data_retention_days', 30);
-logMessage("当前设置: 采集间隔={$collectInterval}分钟, 数据保留={$retentionDays}天 (来自phpIPAM管理设置)", 3);
+logMessage("当前设置: 采集间隔={$collectInterval}分钟, 数据保留={$retentionDays}天 (来自IP地址管理设置)", 3);
 
 // 检查上次执行时间，判断是否应该运行
 $shouldRun = checkShouldRun();
@@ -69,7 +119,20 @@ $totalSkippedRecords = 0;
 $communitiesToTry = ['public', 'private', 'njxxgc', 'ruijie'];
 
 foreach ($devices as $device) {
+    // 检查全局超时
+    if (checkTimeout($scriptGlobalStart, GLOBAL_TIMEOUT, "脚本总执行时间超过" . (GLOBAL_TIMEOUT/60) . "分钟，强制退出")) {
+        break;
+    }
+    
+    // 设置超时保护，防止单个设备处理卡住整个脚本
+    $deviceStartTime = time();
+    
     try {
+        // 设置闹钟信号，如果超过5分钟，会触发SIGALRM
+        if ($pcntlEnabled) {
+            pcntl_alarm(DEVICE_TIMEOUT);
+        }
+        
         // 确保设备有必要的信息
         if (empty($device->hostname)) {
             $device->hostname = $device->ip_addr;
@@ -140,8 +203,22 @@ foreach ($devices as $device) {
         logMessage("设备 {$device->hostname} 处理完成: 保存 {$saved} 条记录，跳过 {$skipped} 条记录", 3);
         $successfulDevices++;
         
+        // 如果处理成功，取消闹钟
+        if ($pcntlEnabled) {
+            pcntl_alarm(0);
+        }
     } catch (Exception $e) {
-        logMessage("处理设备 {$device->hostname} 时发生错误: " . $e->getMessage(), 1);
+        // 取消闹钟
+        if ($pcntlEnabled) {
+            pcntl_alarm(0);
+        }
+        logMessage("处理设备 {$device->hostname} 时出错: " . $e->getMessage(), 1);
+        continue;
+    }
+    
+    // 再次检查是否超时
+    if (checkTimeout($deviceStartTime, DEVICE_TIMEOUT, "处理设备 {$device->hostname} 总时间超过限制，跳过该设备剩余操作")) {
+        continue;
     }
 }
 
@@ -267,6 +344,7 @@ function getEnabledDevices($database) {
  * @return array [保存的记录数, 跳过的记录数]
  */
 function processAndSaveInterfaceData($database, $device, $interfaces) {
+    logMessage("开始处理接口数据: " . count($interfaces) . " 个接口", 3);
     $savedCount = 0;
     $skippedCount = 0;
     
@@ -282,11 +360,15 @@ function processAndSaveInterfaceData($database, $device, $interfaces) {
     $lastRecords = array();
     try {
         $interfaceIds = array();
+        logMessage("准备获取接口ID数组", 3);
         foreach ($interfaces as $interface) {
             if (isset($interface['if_index'])) {
                 $interfaceIds[] = $interface['if_index'];
             }
         }
+        
+        // 这是我们要测试的部分
+        logMessage("接口ID数组: " . json_encode($interfaceIds), 3);
         
         if (!empty($interfaceIds)) {
             $placeholders = implode(',', array_fill(0, count($interfaceIds), '?'));
@@ -296,15 +378,26 @@ function processAndSaveInterfaceData($database, $device, $interfaces) {
                       FROM port_traffic_history 
                       WHERE device_id = ? AND if_index IN ($placeholders) 
                       ORDER BY timestamp DESC";
-                      
-            $results = $database->getObjectsQuery($query, $params);
             
-            if ($results) {
-                foreach ($results as $result) {
-                    if (!isset($lastRecords[$result->if_index])) {
-                        $lastRecords[$result->if_index] = $result;
+            logMessage("SQL查询: " . $query, 3);
+            logMessage("参数: " . json_encode($params), 3);
+            
+            try {
+                // 直接使用runQuery方法
+                $results = $database->runQuery($query, $params);
+                
+                // 确保$results是数组或对象
+                if (is_array($results) || is_object($results)) {
+                    foreach ($results as $result) {
+                        if (!isset($lastRecords[$result->if_index])) {
+                            $lastRecords[$result->if_index] = $result;
+                        }
                     }
+                } else {
+                    logMessage("获取上一次流量记录时数据结构不是数组或对象: " . gettype($results), 2);
                 }
+            } catch (Exception $e) {
+                logMessage("获取上一次流量记录时出错: " . $e->getMessage(), 1);
             }
         }
     } catch (Exception $e) {
@@ -454,85 +547,8 @@ function saveBatchToDatabase($database, $values, $params) {
     }
     
     try {
-        // 首先检查哪些数据已经存在于数据库中
-        // 构建设备ID、接口索引和时间戳的组合列表用于检查
-        $deviceInterfaces = [];
-        $deviceTimestamps = [];
-        $interfaceTimestamps = [];
-        
-        foreach ($params as $key => $value) {
-            if (preg_match('/^device_id_(\d+)$/', $key, $matches)) {
-                $index = $matches[1];
-                $deviceId = $value;
-                $ifIndex = $params["if_index_{$index}"];
-                $timestamp = $params["timestamp_{$index}"];
-                
-                $deviceInterfaces[$index] = [
-                    'device_id' => $deviceId,
-                    'if_index' => $ifIndex,
-                    'timestamp' => $timestamp
-                ];
-                
-                $deviceTimestamps[] = "({$deviceId}, '{$ifIndex}', '{$timestamp}')";
-                $interfaceTimestamps[$deviceId . '_' . $ifIndex . '_' . $timestamp] = $index;
-            }
-        }
-        
-        // 如果没有有效的设备接口数据，不执行插入
-        if (empty($deviceTimestamps)) {
-            logMessage("没有有效的设备接口数据，跳过插入", 2);
-            return;
-        }
-        
-        // 查询已存在的记录
-        $checkQuery = "SELECT device_id, if_index, timestamp FROM port_traffic_history 
-                       WHERE (device_id, if_index, timestamp) IN (" . implode(',', $deviceTimestamps) . ")";
-        
-        try {
-            $existingRecords = $database->getObjectsQuery($checkQuery);
-            
-            // 记录哪些索引对应的数据已存在
-            $existingIndices = [];
-            if ($existingRecords) {
-                foreach ($existingRecords as $record) {
-                    $key = $record->device_id . '_' . $record->if_index . '_' . $record->timestamp;
-                    if (isset($interfaceTimestamps[$key])) {
-                        $existingIndices[] = $interfaceTimestamps[$key];
-                    }
-                }
-            }
-            
-            // 过滤掉已存在的数据，只插入新数据
-            if (!empty($existingIndices)) {
-                $newValues = [];
-                $newParams = [];
-                
-                for ($i = 0; $i < count($values); $i++) {
-                    if (!in_array($i, $existingIndices)) {
-                        $newValues[] = $values[$i];
-                        foreach ($params as $key => $value) {
-                            if (strpos($key, "_{$i}") !== false) {
-                                $newParams[$key] = $value;
-                            }
-                        }
-                    }
-                }
-                
-                // 如果过滤后没有新数据，则不执行插入
-                if (empty($newValues)) {
-                    logMessage("所有数据都已存在，跳过插入", 3);
-                    return;
-                }
-                
-                $values = $newValues;
-                $params = $newParams;
-            }
-        } catch (Exception $e) {
-            logMessage("检查已存在记录时出错，将尝试直接插入: " . $e->getMessage(), 2);
-        }
-        
-        // 执行插入
-        $sql = "INSERT INTO `port_traffic_history` 
+        // 执行插入 - 使用INSERT IGNORE忽略重复键错误
+        $sql = "INSERT IGNORE INTO `port_traffic_history` 
                 (`device_id`, `if_index`, `if_name`, `if_description`, 
                  `in_octets`, `out_octets`, `in_errors`, `out_errors`, 
                  `speed`, `oper_status`, `timestamp`) 
@@ -601,7 +617,25 @@ function logMessage($message, $level = 3) {
     
     // 添加时间戳
     $timestamp = date('Y-m-d H:i:s');
-    $logMessage = "{$timestamp} {$prefix} {$message}";
+    
+    // 获取日志格式配置
+    $logFormat = get_traffic_config('log_format', 'text'); // 'text' 或 'json'
+    
+    if ($logFormat === 'json') {
+        // JSON格式的日志
+        $logData = [
+            'timestamp' => $timestamp,
+            'level' => $level,
+            'level_name' => trim($prefix, '[]'),
+            'message' => $message,
+            'script' => 'traffic_collector',
+            'pid' => getmypid()
+        ];
+        $logMessage = json_encode($logData);
+    } else {
+        // 传统文本格式的日志
+        $logMessage = "{$timestamp} {$prefix} {$message}";
+    }
     
     // 输出日志到控制台
     if (get_traffic_config('verbose_logging', false)) {
@@ -614,8 +648,44 @@ function logMessage($message, $level = 3) {
         mkdir($logDir, 0755, true);
     }
     
-    // 日志文件路径 - 每天创建一个新文件
-    $logFile = $logDir . '/traffic_collector_' . date('Ymd') . '.log';
+    // 获取日志文件配置
+    $logFilePattern = get_traffic_config('log_file_pattern', 'daily'); // 'daily', 'hourly', 或 'single'
+    $maxLogSize = get_traffic_config('max_log_size', 10 * 1024 * 1024); // 默认最大10MB
+    $maxLogFiles = get_traffic_config('max_log_files', 30); // 默认保留30个日志文件
+    $compressLogs = get_traffic_config('compress_logs', true); // 默认压缩旧日志
+    
+    // 根据配置确定日志文件名
+    switch ($logFilePattern) {
+        case 'hourly':
+            $logFile = $logDir . '/traffic_collector_' . date('YmdH') . '.log';
+            break;
+        case 'single':
+            $logFile = $logDir . '/traffic_collector.log';
+            break;
+        case 'daily':
+        default:
+            $logFile = $logDir . '/traffic_collector_' . date('Ymd') . '.log';
+            break;
+    }
+    
+    // 检查日志文件大小，如果超过最大大小，进行轮换
+    if (file_exists($logFile) && filesize($logFile) > $maxLogSize && $logFilePattern === 'single') {
+        $backupFile = $logFile . '.' . date('YmdHis');
+        rename($logFile, $backupFile);
+        
+        // 如果启用压缩，压缩备份文件
+        if ($compressLogs && function_exists('gzopen')) {
+            $gzFile = $backupFile . '.gz';
+            $fp = fopen($backupFile, 'rb');
+            $zp = gzopen($gzFile, 'wb9');
+            while (!feof($fp)) {
+                gzwrite($zp, fread($fp, 1024 * 512));
+            }
+            fclose($fp);
+            gzclose($zp);
+            unlink($backupFile); // 删除未压缩的备份
+        }
+    }
     
     // 将日志写入文件
     file_put_contents($logFile, $logMessage . PHP_EOL, FILE_APPEND);
@@ -623,5 +693,57 @@ function logMessage($message, $level = 3) {
     // 严重错误也记录到PHP标准错误日志
     if ($level <= 2) {
         error_log($logMessage);
+    }
+    
+    // 清理旧日志文件
+    cleanupOldLogs($logDir, $maxLogFiles, $logFilePattern);
+}
+
+/**
+ * 清理旧日志文件
+ *
+ * @param string $logDir 日志目录
+ * @param int $maxLogFiles 最大保留文件数
+ * @param string $logFilePattern 日志文件模式
+ */
+function cleanupOldLogs($logDir, $maxLogFiles, $logFilePattern) {
+    // 确定要清理的文件模式
+    switch ($logFilePattern) {
+        case 'hourly':
+            $pattern = '/^traffic_collector_\d{10}\.log(\.gz)?$/';
+            break;
+        case 'single':
+            $pattern = '/^traffic_collector\.log\.\d{14}(\.gz)?$/';
+            break;
+        case 'daily':
+        default:
+            $pattern = '/^traffic_collector_\d{8}\.log(\.gz)?$/';
+            break;
+    }
+    
+    // 获取所有日志文件
+    $files = [];
+    $dirHandle = opendir($logDir);
+    if ($dirHandle) {
+        while (($file = readdir($dirHandle)) !== false) {
+            if (preg_match($pattern, $file)) {
+                $files[] = $logDir . '/' . $file;
+            }
+        }
+        closedir($dirHandle);
+    }
+    
+    // 按文件修改时间排序
+    usort($files, function($a, $b) {
+        return filemtime($b) - filemtime($a); // 降序排列
+    });
+    
+    // 删除超出限制的旧文件
+    if (count($files) > $maxLogFiles) {
+        for ($i = $maxLogFiles; $i < count($files); $i++) {
+            if (file_exists($files[$i])) {
+                unlink($files[$i]);
+            }
+        }
     }
 } 

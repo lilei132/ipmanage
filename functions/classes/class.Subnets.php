@@ -780,13 +780,30 @@ class Subnets extends Common_functions {
 	}
 
 	/**
-	 * Fetch all subnets marked for ping checks. Needed for pingCheck script
+	 * Fetch all subnets for pingCheck script, regardless of pingSubnet setting
 	 *
 	 * @param  $agentId (default:null)
 	 * @return array|false
 	 */
 	public function fetch_all_subnets_for_pingCheck ($agentId=null) {
-		return $this->fetch_all_subnets_for_Check('pingSubnet', $agentId);
+		// set query
+		$query = "select * from `subnets` where `isFolder` = 0";
+		
+		// 如果指定了扫描代理，且不是主代理(id=1)，则添加条件
+		if(!is_null($agentId) && $agentId!=1) {
+			$query .= " and `scanAgent` = ".$this->Database->escape($agentId);
+		}
+		
+		// fetch
+		try { 
+			$subnets = $this->Database->getObjectsQuery('subnets', $query); 
+		}
+		catch (Exception $e) {
+			$this->Result->show("danger", _("Error: ").$e->getMessage());
+			return false;
+		}
+		# return
+		return (is_array($subnets) && sizeof($subnets)>0) ? $subnets : false;
 	}
 
 	/**
@@ -2942,41 +2959,17 @@ class Subnets extends Common_functions {
 	/**
 	 * Validates provided mac address - checks if it already exist
 	 *
-     *  parameter $unique_required defines where it cannot overlap:
-     *      - section : within section
-     *      - vlan    : within l2 domain
-     *
 	 * @access public
 	 * @param mixed $mac
 	 * @param mixed $sectionId
 	 * @param mixed $vlanId
-	 * @param mixed $unique_required
+	 * @param string $unique_required (default: "vlan")
 	 * @param int $address_id (default: 0)
-	 * @return string|true true if ok, else error text to be displayed
+	 * @return true only if all is ok
 	 */
 	public function validate_multicast_mac ($mac, $sectionId, $vlanId, $unique_required="vlan", $address_id = 0) {
-    	// first put it to common format (1)
-    	$mac = $this->reformat_mac_address ($mac);
-    	$mac_delimited =  pf_explode(":", $mac);
-    	// we permit empty
-        if (is_blank($mac)) {
-            return true;
-        }
-    	// validate mac
-    	elseif (preg_match('/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/', $mac) != 1) {
-        	return _("Invalid MAC address");
-    	}
-    	// multicast check
-    	elseif (!($mac_delimited[0]=="33" && $mac_delimited[1]=="33") && !($mac_delimited[0]=="01" && $mac_delimited[1]=="00" && $mac_delimited[2]=="5e")) {
-            return _("Not multicast MAC address");
-    	}
-    	// check if it already exists
-    	elseif ($this->multicast_address_exists ($this->reformat_mac_address($mac, 4), $sectionId, $vlanId, $unique_required, $address_id)) {
-        	return _("MAC address already exists");
-    	}
-    	else {
-        	return true;
-    	}
+	    // 由于我们现在使用mac字段存储院系/部门，不进行MAC地址验证，始终返回true
+	    return true;
 	}
 
 

@@ -148,24 +148,24 @@ else 				{ print _("IP addresses belonging to ALL nested subnets"); }
 <tr class="th">
 	<?php
 	print "<th class='s_ipaddr'>"._('IP address')."</th>";
-	print "<th>"._('Hostname')."</th>";
+	print "<th>"._('申请人姓名')."</th>";
 	// firewall address object - mandatory if enabled
 	if($zone) {
 		print "<th>"._('FW object')."</th>";
 	}
 	// description
-	print "<th>"._('Description')."</th>";
+	print "<th>"._('工号')."</th>";
 	// mac
 	if(in_array('mac', $selected_ip_fields)) 	{
-    	                                        { print "<th>"._('MAC')."</th>"; }
+    	                                        { print "<th>"._('院系/部门')."</th>"; }
     }
 	# note, device, port, owner, location
 	if(in_array('note', $selected_ip_fields)) 	{ print "<th></th>"; }
 	if(in_array('switch', $selected_ip_fields) && $User->get_module_permissions ("devices")>=User::ACCESS_R) { print "<th class='hidden-xs hidden-sm hidden-md'>"._('Device')."</th>"; }
 	if(in_array('port', $selected_ip_fields)) 	{ print "<th class='hidden-xs hidden-sm hidden-md'>"._('Port')."</th>"; }
-	if(in_array('location', $selected_ip_fields) && $User->get_module_permissions ("locations")>=User::ACCESS_R) 	{ print "<th class='hidden-xs hidden-sm hidden-md'>"._('Location')."</th>"; }
+	if(in_array('location', $selected_ip_fields) && $User->get_module_permissions ("locations")>=User::ACCESS_R) 	{ print "<th class='hidden-xs hidden-sm hidden-md'>"._('存放地点')."</th>"; }
 	if(in_array('owner', $selected_ip_fields)) 	{ print "<th class='hidden-xs hidden-sm'>"._('Owner')."</th>"; }
-	if($User->settings->enableCustomers=="1" && @$cnt_obj["customer_id"]>0 && $User->get_module_permissions ("customers")>=User::ACCESS_R)	{ print "<th class='hidden-xs hidden-sm'>"._('Customer')."</th>"; }
+	if($User->settings->enableCustomers=="1" && @$cnt_obj["customer_id"]>0 && $User->get_module_permissions ("customers")>=User::ACCESS_R)	{ print "<th class='hidden-xs hidden-sm'>"._('存放地点')."</th>"; }
 	// custom fields
 	if(sizeof($custom_fields) > 0) {
 		foreach($custom_fields as $myField) 	{
@@ -537,6 +537,7 @@ else {
 					print "<a class='edit_ipaddress   btn btn-xs btn-default modIPaddr' data-action='edit'   data-subnetId='".$addresses[$n]->subnetId."' data-id='".$addresses[$n]->id."' href='#' >															<i class='fa fa-gray fa-pencil'></i></a>";
 					print "<a class='ping_ipaddress   btn btn-xs btn-default' data-subnetId='".$addresses[$n]->subnetId."' data-id='".$addresses[$n]->id."' href='#' rel='tooltip' data-container='body' title='"._('Check availability')."'>					<i class='fa fa-gray fa-cogs'></i></a>";
 					print "<a class='search_ipaddress btn btn-xs btn-default         "; if(is_blank($resolve['name'])) { print "disabled"; } print "' href='".create_link("tools","search", $resolve['name'])."' "; if(!is_blank($resolve['name']))   { print "rel='tooltip' data-container='body' title='"._('Search same hostnames in db')."'"; } print ">	<i class='fa fa-gray fa-search'></i></a>";
+					print "<a class='ip_details       btn btn-xs btn-default' data-subnetId='".$addresses[$n]->subnetId."' data-id='".$addresses[$n]->id."' href='javascript:void(0);' rel='tooltip' data-container='body' title='"._('查看详细信息')."'>					<i class='fa fa-gray fa-info-circle'></i></a>";
 					print "<a class='mail_ipaddress   btn btn-xs btn-default          ' href='#' data-id='".$addresses[$n]->id."' rel='tooltip' data-container='body' title='"._('Send mail notification')."'>																																		<i class='fa fa-gray fa-envelope-o'></i></a>";
 					if($zone) { print "<a class='fw_autogen	   	  btn btn-default btn-xs          ' href='#' data-subnetid='".$addresses[$n]->subnetId."' data-action='adr' data-ipid='".$addresses[$n]->id."' data-dnsname='".$addresses[$n]->hostname."' rel='tooltip' data-container='body' title='"._('Generate or regenerate a firewall address object of this ip address.')."'><i class='fa fa-gray fa-repeat'></i></a>"; }
 					print "<a class='delete_ipaddress btn btn-xs btn-default modIPaddr' data-action='delete' data-subnetId='".$addresses[$n]->subnetId."' data-id='".$addresses[$n]->id."' href='#' id2='".$Subnets->transform_to_dotted($addresses[$n]->ip_addr)."'>		<i class='fa fa-gray fa-times'>  </i></a>";
@@ -557,6 +558,7 @@ else {
 					print "<a class='edit_ipaddress   btn btn-xs btn-default disabled' rel='tooltip' data-container='body' title='"._('Edit IP address details (disabled)')."'>													<i class='fa fa-gray fa-pencil'></i></a>";
 					print "<a class='				   btn btn-xs btn-default disabled'  data-id='".$addresses[$n]->id."' href='#' rel='tooltip' data-container='body' title='"._('Check availability')."'>					<i class='fa fa-gray fa-cogs'></i></a>";
 					print "<a class='search_ipaddress btn btn-xs btn-default         "; if(is_blank($resolve['name'])) { print "disabled"; } print "' href='".create_link("tools","search",$resolve['name'])."' "; if(!is_blank($resolve['name'])) { print "rel='tooltip' data-container='body' title='"._('Search same hostnames in db')."'"; } print ">	<i class='fa fa-gray fa-search'></i></a>";
+					print "<a class='ip_details       btn btn-xs btn-default' data-subnetId='".$addresses[$n]->subnetId."' data-id='".$addresses[$n]->id."' href='javascript:void(0);' rel='tooltip' data-container='body' title='"._('查看详细信息')."'>					<i class='fa fa-gray fa-info-circle'></i></a>";
 					print "<a class='mail_ipaddress   btn btn-xs btn-default          ' href='#' data-id='".$addresses[$n]->id."' rel='tooltip' data-container='body' title='"._('Send mail notification')."'>				<i class='fa fa-gray fa-envelope-o'></i></a>";
 					print "<a class='delete_ipaddress btn btn-xs btn-default disabled' rel='tooltip' data-container='body' title='"._('Delete IP address (disabled)')."'>														<i class='fa fa-gray fa-times'></i></a>";
 				}
@@ -678,3 +680,29 @@ else {
 
 </tbody>
 </table>	<!-- end IP address table -->
+
+<!-- IP详情弹窗样式 -->
+<style>
+#popupOverlay2 {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 9999;
+}
+
+#popupOverlay2 .popup_w400 {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    width: 400px;
+    display: none;
+}
+</style>

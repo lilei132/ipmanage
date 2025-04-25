@@ -1,8 +1,9 @@
+#!/usr/bin/php
 <?php
 /**
- * phpIPAM 流量收集通用SNMP模块
+ * IP地址管理 流量收集通用SNMP模块
  *
- * 提供通用的SNMP操作接口，支持各种设备厂商
+ * 提供SNMP查询和数据获取的通用函数
  */
 
 // 引入配置文件
@@ -158,7 +159,7 @@ class TrafficSNMP {
         // 使用SNMP探测厂商
         try {
             // 获取系统OID
-            $sysObjectID = $this->snmpGet("1.3.6.1.2.1.1.2.0");
+            $sysObjectID = $this->safeSnmpGet("1.3.6.1.2.1.1.2.0");
             
             if (!empty($sysObjectID)) {
                 $this->logMessage("设备系统OID: {$sysObjectID}", 3);
@@ -176,7 +177,7 @@ class TrafficSNMP {
                 }
                 
                 // 通过关键字匹配识别
-                $sysDesc = $this->snmpGet("1.3.6.1.2.1.1.1.0");
+                $sysDesc = $this->safeSnmpGet("1.3.6.1.2.1.1.1.0");
                 if (!empty($sysDesc)) {
                     $this->logMessage("设备描述: {$sysDesc}", 3);
                     
@@ -203,13 +204,13 @@ class TrafficSNMP {
                     }
                 }
             }
-            
-            // 默认为未知厂商
-            $this->vendor = 'unknown';
-            $this->logMessage("无法识别设备厂商，使用默认设置", 2);
         } catch (Exception $e) {
-            $this->logMessage("厂商识别失败: " . $e->getMessage(), 1);
+            $this->logMessage("SNMP探测厂商时出错: " . $e->getMessage(), 2);
         }
+        
+        // 如果未识别出厂商，使用默认值
+        $this->logMessage("无法识别设备厂商，使用通用设置", 2);
+        $this->applyVendorSpecificSettings('unknown');
     }
     
     /**
@@ -235,20 +236,31 @@ class TrafficSNMP {
     }
     
     /**
-     * 获取SNMP数据 (GET)
+     * 执行SNMP获取 (GET)
      * 
      * @param string $oid 要获取的OID
-     * @return mixed 获取的值
+     * @return mixed 获取的值或false
      */
     public function snmpGet($oid) {
         $this->last_error = "";
         
         try {
-            // 构建SNMP会话选项
-            $options = [
-                'timeout' => $this->timeout,
-                'retries' => $this->retries
-            ];
+            // 记录开始时间
+            $start_time = microtime(true);
+            
+            // 最大执行时间
+            $max_exec_time = 5; // 5秒
+            
+            // 超时标志
+            $timeout_flag = false;
+            
+            // 设置超时处理
+            if (function_exists('pcntl_sigtimedwait')) {
+                pcntl_signal(SIGALRM, function() use (&$timeout_flag) {
+                    $timeout_flag = true;
+                }, false);
+                pcntl_alarm(5); // 5秒超时
+            }
             
             // 根据SNMP版本获取数据
             switch ($this->version) {
@@ -265,6 +277,24 @@ class TrafficSNMP {
                     break;
                 default:
                     $result = @snmp2_get($this->host, $this->community, $oid, $this->timeout, $this->retries);
+            }
+            
+            // 取消闹钟
+            if (function_exists('pcntl_sigtimedwait')) {
+                pcntl_alarm(0);
+            }
+            
+            // 检查是否超时
+            if ($timeout_flag) {
+                throw new Exception("SNMP GET操作超时");
+            }
+            
+            // 检查操作时间
+            $end_time = microtime(true);
+            $exec_time = $end_time - $start_time;
+            
+            if ($exec_time > $max_exec_time) {
+                $this->logMessage("SNMP GET操作执行时间过长: " . round($exec_time, 2) . "秒", 2);
             }
             
             if ($result === false) {
@@ -289,21 +319,56 @@ class TrafficSNMP {
         $this->last_error = "";
         
         try {
-            // 根据SNMP版本进行遍历
+            // 记录开始时间
+            $start_time = microtime(true);
+            
+            // 最大执行时间
+            $max_exec_time = 5; // 5秒
+            
+            // 超时标志
+            $timeout_flag = false;
+            
+            // 设置超时处理
+            if (function_exists('pcntl_sigtimedwait')) {
+                pcntl_signal(SIGALRM, function() use (&$timeout_flag) {
+                    $timeout_flag = true;
+                }, false);
+                pcntl_alarm(5); // 5秒超时
+            }
+            
+            // 根据SNMP版本遍历数据
             switch ($this->version) {
                 case '1':
-                    $result = @snmprealwalk($this->host, $this->community, $oid, $this->timeout, $this->retries);
+                    $result = @snmpwalk($this->host, $this->community, $oid, $this->timeout, $this->retries);
                     break;
                 case '2':
                 case '2c':
-                    $result = @snmp2_real_walk($this->host, $this->community, $oid, $this->timeout, $this->retries);
+                    $result = @snmp2_walk($this->host, $this->community, $oid, $this->timeout, $this->retries);
                     break;
                 case '3':
                     // 暂不支持SNMPv3
                     throw new Exception("暂不支持SNMPv3");
                     break;
                 default:
-                    $result = @snmp2_real_walk($this->host, $this->community, $oid, $this->timeout, $this->retries);
+                    $result = @snmp2_walk($this->host, $this->community, $oid, $this->timeout, $this->retries);
+            }
+            
+            // 取消闹钟
+            if (function_exists('pcntl_sigtimedwait')) {
+                pcntl_alarm(0);
+            }
+            
+            // 检查是否超时
+            if ($timeout_flag) {
+                throw new Exception("SNMP Walk操作超时");
+            }
+            
+            // 检查操作时间
+            $end_time = microtime(true);
+            $exec_time = $end_time - $start_time;
+            
+            if ($exec_time > $max_exec_time) {
+                $this->logMessage("SNMP WALK操作执行时间过长: " . round($exec_time, 2) . "秒", 2);
             }
             
             if ($result === false) {
@@ -311,18 +376,74 @@ class TrafficSNMP {
             }
             
             // 处理结果
-            $parsed = [];
-            foreach ($result as $id => $value) {
-                $parts = explode('.', $id);
-                $index = end($parts);
-                $parsed[$index] = $this->parseSnmpValue($value);
+            $resultArray = array();
+            foreach ($result as $key => $value) {
+                // 提取OID索引
+                $oid_index = preg_replace('/^.*\.([0-9]+)$/', '$1', $key);
+                $resultArray["$oid.$oid_index"] = $this->parseSnmpValue($value);
             }
             
-            return $parsed;
+            return $resultArray;
         } catch (Exception $e) {
             $this->last_error = $e->getMessage();
             $this->logMessage("SNMP Walk错误 (OID: {$oid}): " . $e->getMessage(), 1);
-            return [];
+            return array();
+        }
+    }
+    
+    /**
+     * 安全执行SNMP遍历 (WALK)，支持备选OID和超时保护
+     * 
+     * @param string $primaryOid 主要OID
+     * @param string $backupOid 备选OID，当主要OID失败时使用
+     * @param int $timeout 超时时间（秒）
+     * @return array 遍历结果数组
+     */
+    public function safeSnmpWalk($primaryOid, $backupOid = null, $timeout = 5) {
+        // 记录开始时间
+        $start_time = microtime(true);
+        $this->logMessage("开始安全SNMP遍历 OID: $primaryOid", 3);
+        
+        try {
+            // 设置SNMP超时保护
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm($timeout);
+            }
+            
+            // 尝试主要OID
+            $result = $this->snmpWalk($primaryOid);
+            
+            // 如果主要OID失败且提供了备选OID，尝试备选OID
+            if ((empty($result) || $result === false) && !empty($backupOid)) {
+                $this->logMessage("主要OID $primaryOid 失败，尝试备选OID $backupOid", 2);
+                $result = $this->snmpWalk($backupOid);
+            }
+            
+            // 取消超时
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+            
+            // 记录执行时间
+            $end_time = microtime(true);
+            $exec_time = round($end_time - $start_time, 2);
+            
+            // 记录结果
+            if (!empty($result)) {
+                $this->logMessage("SNMP遍历成功，获取 " . count($result) . " 个结果，耗时 $exec_time 秒", 3);
+            } else {
+                $this->logMessage("SNMP遍历无数据返回，耗时 $exec_time 秒", 2);
+            }
+            
+            return $result;
+        } catch (Exception $e) {
+            // 取消超时
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+            
+            $this->logMessage("安全SNMP遍历出错: " . $e->getMessage(), 1);
+            return array();
         }
     }
     
@@ -379,147 +500,177 @@ class TrafficSNMP {
         $this->logMessage("开始获取设备接口流量数据", 3);
         
         try {
+            // 设置超时警告
+            logMessage("开始SNMP操作，如果长时间无响应可能是SNMP库卡住", 2);
+            
+            // 设置SNMP超时保护
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(60); // 设置60秒超时
+            }
+            
             // 基于厂商选择不同的处理方法
             switch ($this->vendor) {
                 case 'h3c':
                     $this->logMessage("使用H3C专用方法获取接口数据", 3);
-                    return $this->getH3CInterfaceTraffic();
+                    $result = $this->getH3CInterfaceTraffic();
+                    break;
                     
                 case 'huawei':
                     $this->logMessage("使用华为专用方法获取接口数据", 3);
-                    return $this->getHuaweiInterfaceTraffic();
+                    $result = $this->getHuaweiInterfaceTraffic();
+                    break;
                     
                 case 'ruijie':
                     $this->logMessage("使用锐捷专用方法获取接口数据", 3);
-                    return $this->getRuijieInterfaceTraffic();
+                    $result = $this->getRuijieInterfaceTraffic();
+                    break;
                     
                 default:
                     $this->logMessage("使用标准方法获取接口数据", 3);
-                    return $this->getStandardInterfaceTraffic();
+                    $result = $this->getStandardInterfaceTraffic();
             }
+            
+            // 取消超时
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+            
+            return $result;
         } catch (Exception $e) {
+            // 取消超时
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+            
             $this->logMessage("获取接口数据时发生错误: " . $e->getMessage(), 1);
             return [];
         }
     }
     
     /**
-     * 获取H3C设备接口流量
+     * 获取H3C设备的接口流量数据（适用于H3C系列设备）
      * 
-     * @return array 接口数据数组
+     * @return array 接口流量数据
      */
     private function getH3CInterfaceTraffic() {
-        $interfaces = [];
+        $this->logMessage("开始收集H3C设备的接口流量数据", 3);
+        $startTime = microtime(true);
         
-        // 获取接口名称
-        $ifNames = $this->snmpWalk(get_traffic_config('oid_map.if_name'));
-        if (empty($ifNames)) {
-            $ifNames = $this->snmpWalk(get_traffic_config('oid_map.if_descr'));
-        }
+        $interfaceTraffic = array();
         
-        // 如果接口名称获取失败，返回空数组
-        if (empty($ifNames)) {
-            $this->logMessage("未能获取H3C设备接口名称", 1);
-            return $interfaces;
-        }
-        
-        $this->logMessage("获取到 " . count($ifNames) . " 个H3C设备接口", 3);
-        
-        // 获取接口描述 (ifAlias / ifDescr)
-        $ifDescriptions = [];
-        $ifAlias = $this->snmpWalk(get_traffic_config('oid_map.if_alias'));
-        if (!empty($ifAlias)) {
-            $ifDescriptions = $ifAlias;
-        }
-        
-        // 获取接口入流量 - 尝试H3C特有OID
-        $h3cInOctets = [];
-        $h3cOid = get_traffic_config('device_types.h3c.oid_map.h3c_if_in_octets');
-        if (!empty($h3cOid)) {
-            $h3cInOctets = $this->snmpWalk($h3cOid);
-        }
-        
-        // 如果H3C特有OID失败，尝试高容量计数器
-        $inOctets = [];
-        if (empty($h3cInOctets)) {
-            $inOctets = $this->snmpWalk(get_traffic_config('oid_map.if_hc_in_octets'));
-            if (empty($inOctets)) {
-                // 如果高容量计数器失败，尝试标准计数器
-                $inOctets = $this->snmpWalk(get_traffic_config('oid_map.if_in_octets'));
-            }
-        } else {
-            $inOctets = $h3cInOctets;
-        }
-        
-        // 获取接口出流量 - 类似入流量的处理逻辑
-        $h3cOutOctets = [];
-        $h3cOid = get_traffic_config('device_types.h3c.oid_map.h3c_if_out_octets');
-        if (!empty($h3cOid)) {
-            $h3cOutOctets = $this->snmpWalk($h3cOid);
-        }
-        
-        $outOctets = [];
-        if (empty($h3cOutOctets)) {
-            $outOctets = $this->snmpWalk(get_traffic_config('oid_map.if_hc_out_octets'));
-            if (empty($outOctets)) {
-                $outOctets = $this->snmpWalk(get_traffic_config('oid_map.if_out_octets'));
-            }
-        } else {
-            $outOctets = $h3cOutOctets;
-        }
-        
-        // 获取接口错误
-        $inErrors = $this->snmpWalk(get_traffic_config('oid_map.if_in_errors'));
-        $outErrors = $this->snmpWalk(get_traffic_config('oid_map.if_out_errors'));
-        
-        // 获取接口状态
-        $operStatus = $this->snmpWalk(get_traffic_config('oid_map.if_oper_status'));
-        
-        // 获取接口速率
-        $speed = [];
-        $highSpeed = $this->snmpWalk(get_traffic_config('oid_map.if_high_speed'));
-        if (!empty($highSpeed)) {
-            foreach ($highSpeed as $index => $value) {
-                // ifHighSpeed单位是Mbps，需要转换为bps
-                $speed[$index] = intval($value) * 1000000;
-            }
-        } else {
-            $speed = $this->snmpWalk(get_traffic_config('oid_map.if_speed'));
-        }
-        
-        // 构建接口数据数组
-        foreach ($ifNames as $index => $ifName) {
-            $interface = [
-                'if_index' => $index,
-                'name' => $ifName,
-                'description' => isset($ifDescriptions[$index]) ? $ifDescriptions[$index] : '',
-                'in_octets' => isset($inOctets[$index]) ? $inOctets[$index] : 0,
-                'out_octets' => isset($outOctets[$index]) ? $outOctets[$index] : 0,
-                'in_errors' => isset($inErrors[$index]) ? $inErrors[$index] : 0,
-                'out_errors' => isset($outErrors[$index]) ? $outErrors[$index] : 0,
-                'speed' => isset($speed[$index]) ? $speed[$index] : 0
-            ];
-            
-            // 处理接口状态
-            if (isset($operStatus[$index])) {
-                $status = $operStatus[$index];
-                if (is_numeric($status)) {
-                    switch ($status) {
-                        case '1': $interface['oper_status'] = 'up'; break;
-                        case '2': $interface['oper_status'] = 'down'; break;
-                        default: $interface['oper_status'] = 'unknown';
-                    }
-                } else {
-                    $interface['oper_status'] = $status;
+        try {
+            // 首先尝试获取H3C专用的ifName (.1.3.6.1.4.1.25506.2.4.1.1.2)
+            $interfaceNames = $this->safeSnmpWalk('.1.3.6.1.4.1.25506.2.4.1.1.2');
+            if (empty($interfaceNames)) {
+                // 如果获取不到，尝试标准ifName
+                $interfaceNames = $this->safeSnmpWalk('.1.3.6.1.2.1.2.2.1.2');
+                if (empty($interfaceNames)) {
+                    $this->logMessage("无法从H3C设备 {$this->host} 获取接口名称", 2);
+                    return array();
                 }
-            } else {
-                $interface['oper_status'] = 'unknown';
             }
             
-            $interfaces[$index] = $interface;
+            // 获取接口描述 (可能是H3C专用OID或标准OID)
+            $interfaceDescriptions = $this->safeSnmpWalk('.1.3.6.1.4.1.25506.2.4.1.1.4', '.1.3.6.1.2.1.31.1.1.1.18');
+            
+            // 获取接口速率 (bps)
+            $interfaceSpeeds = $this->safeSnmpWalk('.1.3.6.1.2.1.2.2.1.5', '.1.3.6.1.2.1.31.1.1.1.15');
+            
+            // 获取接口操作状态
+            $interfaceOperStatus = $this->safeSnmpWalk('.1.3.6.1.2.1.2.2.1.8');
+            
+            // 获取接口入流量 (首选64位计数器)
+            $interfaceInOctets = $this->safeSnmpWalk('.1.3.6.1.2.1.31.1.1.1.6', '.1.3.6.1.2.1.2.2.1.10');
+            
+            // 获取接口出流量 (首选64位计数器)
+            $interfaceOutOctets = $this->safeSnmpWalk('.1.3.6.1.2.1.31.1.1.1.10', '.1.3.6.1.2.1.2.2.1.16');
+            
+            // 获取接口入错误数
+            $interfaceInErrors = $this->safeSnmpWalk('.1.3.6.1.2.1.2.2.1.14');
+            
+            // 获取接口出错误数
+            $interfaceOutErrors = $this->safeSnmpWalk('.1.3.6.1.2.1.2.2.1.20');
+            
+            // 构建接口数据
+            foreach ($interfaceNames as $index => $name) {
+                // 清理索引，例如 ".1.3.6.1.4.1.25506.2.4.1.1.2.1" 中提取 "1"
+                $idx = explode('.', $index);
+                $interfaceIndex = end($idx);
+                
+                // 检查接口是否活动
+                $operStatus = isset($interfaceOperStatus[".1.3.6.1.2.1.2.2.1.8.$interfaceIndex"]) 
+                            ? $interfaceOperStatus[".1.3.6.1.2.1.2.2.1.8.$interfaceIndex"] 
+                            : 0;
+                
+                // 跳过非活动接口和特定类型接口
+                if (preg_match('/^(Null|Loopback|NULL|InLoopBack|LoopBack)/i', $name) && $operStatus != 1) {
+                    continue;
+                }
+                
+                // 从两个可能的OID中获取描述
+                $description = '';
+                if (isset($interfaceDescriptions[".1.3.6.1.4.1.25506.2.4.1.1.4.$interfaceIndex"])) {
+                    $description = $interfaceDescriptions[".1.3.6.1.4.1.25506.2.4.1.1.4.$interfaceIndex"];
+                } elseif (isset($interfaceDescriptions[".1.3.6.1.2.1.31.1.1.1.18.$interfaceIndex"])) {
+                    $description = $interfaceDescriptions[".1.3.6.1.2.1.31.1.1.1.18.$interfaceIndex"];
+                }
+                
+                // 获取速率
+                $speed = isset($interfaceSpeeds[".1.3.6.1.2.1.2.2.1.5.$interfaceIndex"]) 
+                       ? $interfaceSpeeds[".1.3.6.1.2.1.2.2.1.5.$interfaceIndex"] 
+                       : (isset($interfaceSpeeds[".1.3.6.1.2.1.31.1.1.1.15.$interfaceIndex"]) 
+                         ? $interfaceSpeeds[".1.3.6.1.2.1.31.1.1.1.15.$interfaceIndex"] * 1000000 
+                         : 0);
+                
+                // 获取流量统计
+                $inOctets = isset($interfaceInOctets[".1.3.6.1.2.1.31.1.1.1.6.$interfaceIndex"]) 
+                          ? $interfaceInOctets[".1.3.6.1.2.1.31.1.1.1.6.$interfaceIndex"] 
+                          : (isset($interfaceInOctets[".1.3.6.1.2.1.2.2.1.10.$interfaceIndex"]) 
+                            ? $interfaceInOctets[".1.3.6.1.2.1.2.2.1.10.$interfaceIndex"] 
+                            : 0);
+                
+                $outOctets = isset($interfaceOutOctets[".1.3.6.1.2.1.31.1.1.1.10.$interfaceIndex"]) 
+                           ? $interfaceOutOctets[".1.3.6.1.2.1.31.1.1.1.10.$interfaceIndex"] 
+                           : (isset($interfaceOutOctets[".1.3.6.1.2.1.2.2.1.16.$interfaceIndex"]) 
+                             ? $interfaceOutOctets[".1.3.6.1.2.1.2.2.1.16.$interfaceIndex"] 
+                             : 0);
+                
+                // 获取错误统计
+                $inErrors = isset($interfaceInErrors[".1.3.6.1.2.1.2.2.1.14.$interfaceIndex"]) 
+                          ? $interfaceInErrors[".1.3.6.1.2.1.2.2.1.14.$interfaceIndex"] 
+                          : 0;
+                
+                $outErrors = isset($interfaceOutErrors[".1.3.6.1.2.1.2.2.1.20.$interfaceIndex"]) 
+                           ? $interfaceOutErrors[".1.3.6.1.2.1.2.2.1.20.$interfaceIndex"] 
+                           : 0;
+                
+                // 过滤掉无效的结果
+                if ($inOctets == "" && $outOctets == "") {
+                    continue;
+                }
+                
+                $interfaceTraffic[$interfaceIndex] = array(
+                    'name' => $name,
+                    'description' => $description,
+                    'status' => $operStatus,
+                    'speed' => $speed,
+                    'in_octets' => $inOctets,
+                    'out_octets' => $outOctets,
+                    'in_errors' => $inErrors,
+                    'out_errors' => $outErrors,
+                    'if_index' => $interfaceIndex
+                );
+            }
+            
+            $endTime = microtime(true);
+            $timeTaken = round($endTime - $startTime, 2);
+            $this->logMessage("H3C设备接口流量数据收集完成，共 " . count($interfaceTraffic) . " 个接口，耗时 {$timeTaken} 秒", 3);
+            
+        } catch (Exception $e) {
+            $this->logMessage("收集H3C接口流量数据时出错: " . $e->getMessage(), 1);
         }
         
-        return $interfaces;
+        return $interfaceTraffic;
     }
     
     /**
@@ -557,14 +708,14 @@ class TrafficSNMP {
             $huaweiIfName = "1.3.6.1.4.1.2011.5.25.31.1.1.1.1.7";
             
             // 尝试获取接口名称和描述
-            $ifNames = $this->snmpWalk($huaweiIfName);
+            $ifNames = $this->safeSnmpWalk($huaweiIfName);
             if (empty($ifNames)) {
-                $ifNames = $this->snmpWalk(get_traffic_config('oid_map.if_name'));
+                $ifNames = $this->safeSnmpWalk(get_traffic_config('oid_map.if_name'));
             }
             
-            $ifDescriptions = $this->snmpWalk($huaweiIfDescr);
+            $ifDescriptions = $this->safeSnmpWalk($huaweiIfDescr);
             if (empty($ifDescriptions)) {
-                $ifDescriptions = $this->snmpWalk(get_traffic_config('oid_map.if_descr'));
+                $ifDescriptions = $this->safeSnmpWalk(get_traffic_config('oid_map.if_descr'));
             }
             
             // 如果都获取失败，返回空数组
@@ -584,23 +735,17 @@ class TrafficSNMP {
             $this->logMessage("获取到 " . count($interfaceIndices) . " 个接口索引", 3);
             
             // 获取流量数据
-            $inOctets = $this->snmpWalk(get_traffic_config('oid_map.if_hc_in_octets'));
-            if (empty($inOctets)) {
-                $inOctets = $this->snmpWalk(get_traffic_config('oid_map.if_in_octets'));
-            }
+            $inOctets = $this->safeSnmpWalk(get_traffic_config('oid_map.if_hc_in_octets'), get_traffic_config('oid_map.if_in_octets'));
             
-            $outOctets = $this->snmpWalk(get_traffic_config('oid_map.if_hc_out_octets'));
-            if (empty($outOctets)) {
-                $outOctets = $this->snmpWalk(get_traffic_config('oid_map.if_out_octets'));
-            }
+            $outOctets = $this->safeSnmpWalk(get_traffic_config('oid_map.if_hc_out_octets'), get_traffic_config('oid_map.if_out_octets'));
             
             // 获取错误数据
-            $inErrors = $this->snmpWalk(get_traffic_config('oid_map.if_in_errors'));
-            $outErrors = $this->snmpWalk(get_traffic_config('oid_map.if_out_errors'));
+            $inErrors = $this->safeSnmpWalk(get_traffic_config('oid_map.if_in_errors'));
+            $outErrors = $this->safeSnmpWalk(get_traffic_config('oid_map.if_out_errors'));
             
             // 获取状态和速率
-            $operStatus = $this->snmpWalk(get_traffic_config('oid_map.if_oper_status'));
-            $speed = $this->snmpWalk(get_traffic_config('oid_map.if_speed'));
+            $operStatus = $this->safeSnmpWalk(get_traffic_config('oid_map.if_oper_status'));
+            $speed = $this->safeSnmpWalk(get_traffic_config('oid_map.if_speed'));
             
             // 构建接口数据
             foreach ($interfaceIndices as $index) {
@@ -667,7 +812,7 @@ class TrafficSNMP {
                 $this->community = $community;
                 
                 // 尝试获取系统描述，测试连接
-                $sysDescr = $this->snmpGet("1.3.6.1.2.1.1.1.0");
+                $sysDescr = $this->safeSnmpGet("1.3.6.1.2.1.1.1.0");
                 if ($sysDescr !== false) {
                     $this->logMessage("使用社区名 '{$community}' 成功连接到锐捷设备", 3);
                     $interfaces = $this->getStandardInterfaceTraffic();
@@ -691,96 +836,113 @@ class TrafficSNMP {
     }
     
     /**
-     * 获取标准设备接口流量（适用于大多数设备）
+     * 获取标准设备的接口流量数据
      * 
-     * @return array 接口数据数组
+     * @return array 接口流量数据
      */
     private function getStandardInterfaceTraffic() {
-        $interfaces = [];
+        $this->logMessage("开始收集标准设备的接口流量数据", 3);
+        $startTime = microtime(true);
         
-        // 获取接口名称
-        $ifNames = $this->snmpWalk(get_traffic_config('oid_map.if_name'));
-        if (empty($ifNames)) {
-            $ifNames = $this->snmpWalk(get_traffic_config('oid_map.if_descr'));
-            if (empty($ifNames)) {
-                $this->logMessage("未能获取设备接口名称", 1);
-                return $interfaces;
+        $interfaceTraffic = array();
+        
+        try {
+            // 获取接口名称 (.1.3.6.1.2.1.2.2.1.2)
+            $interfaceNames = $this->safeSnmpWalk('.1.3.6.1.2.1.2.2.1.2');
+            if (empty($interfaceNames)) {
+                $this->logMessage("无法从设备 {$this->host} 获取接口名称", 2);
+                return array();
             }
-        }
-        
-        $this->logMessage("获取到 " . count($ifNames) . " 个接口", 3);
-        
-        // 获取接口描述 (ifAlias / ifDescr)
-        $ifDescriptions = [];
-        $ifAlias = $this->snmpWalk(get_traffic_config('oid_map.if_alias'));
-        if (!empty($ifAlias)) {
-            $ifDescriptions = $ifAlias;
-        }
-        
-        // 获取接口入流量
-        $inOctets = $this->snmpWalk(get_traffic_config('oid_map.if_hc_in_octets'));
-        if (empty($inOctets)) {
-            $inOctets = $this->snmpWalk(get_traffic_config('oid_map.if_in_octets'));
-        }
-        
-        // 获取接口出流量
-        $outOctets = $this->snmpWalk(get_traffic_config('oid_map.if_hc_out_octets'));
-        if (empty($outOctets)) {
-            $outOctets = $this->snmpWalk(get_traffic_config('oid_map.if_out_octets'));
-        }
-        
-        // 获取接口错误
-        $inErrors = $this->snmpWalk(get_traffic_config('oid_map.if_in_errors'));
-        $outErrors = $this->snmpWalk(get_traffic_config('oid_map.if_out_errors'));
-        
-        // 获取接口状态
-        $operStatus = $this->snmpWalk(get_traffic_config('oid_map.if_oper_status'));
-        
-        // 获取接口速率
-        $speed = [];
-        $highSpeed = $this->snmpWalk(get_traffic_config('oid_map.if_high_speed'));
-        if (!empty($highSpeed)) {
-            foreach ($highSpeed as $index => $value) {
-                // ifHighSpeed单位是Mbps，需要转换为bps
-                $speed[$index] = intval($value) * 1000000;
-            }
-        } else {
-            $speed = $this->snmpWalk(get_traffic_config('oid_map.if_speed'));
-        }
-        
-        // 构建接口数据数组
-        foreach ($ifNames as $index => $ifName) {
-            $interface = [
-                'if_index' => $index,
-                'name' => $ifName,
-                'description' => isset($ifDescriptions[$index]) ? $ifDescriptions[$index] : '',
-                'in_octets' => isset($inOctets[$index]) ? $inOctets[$index] : 0,
-                'out_octets' => isset($outOctets[$index]) ? $outOctets[$index] : 0,
-                'in_errors' => isset($inErrors[$index]) ? $inErrors[$index] : 0,
-                'out_errors' => isset($outErrors[$index]) ? $outErrors[$index] : 0,
-                'speed' => isset($speed[$index]) ? $speed[$index] : 0
-            ];
             
-            // 处理接口状态
-            if (isset($operStatus[$index])) {
-                $status = $operStatus[$index];
-                if (is_numeric($status)) {
-                    switch ($status) {
-                        case '1': $interface['oper_status'] = 'up'; break;
-                        case '2': $interface['oper_status'] = 'down'; break;
-                        default: $interface['oper_status'] = 'unknown';
-                    }
-                } else {
-                    $interface['oper_status'] = $status;
+            // 获取接口描述 (.1.3.6.1.2.1.31.1.1.1.18)
+            $interfaceDescriptions = $this->safeSnmpWalk('.1.3.6.1.2.1.31.1.1.1.18');
+            
+            // 获取接口带宽 (.1.3.6.1.2.1.2.2.1.5)
+            $interfaceSpeeds = $this->safeSnmpWalk('.1.3.6.1.2.1.2.2.1.5', '.1.3.6.1.2.1.31.1.1.1.15');
+            
+            // 获取接口操作状态 (.1.3.6.1.2.1.2.2.1.8) - 1:up, 2:down
+            $interfaceOperStatus = $this->safeSnmpWalk('.1.3.6.1.2.1.2.2.1.8');
+            
+            // 获取接口入流量 (.1.3.6.1.2.1.31.1.1.1.6)
+            $interfaceInOctets = $this->safeSnmpWalk('.1.3.6.1.2.1.31.1.1.1.6', '.1.3.6.1.2.1.2.2.1.10');
+            
+            // 获取接口出流量 (.1.3.6.1.2.1.31.1.1.1.10)
+            $interfaceOutOctets = $this->safeSnmpWalk('.1.3.6.1.2.1.31.1.1.1.10', '.1.3.6.1.2.1.2.2.1.16');
+            
+            // 获取接口入错误数 (.1.3.6.1.2.1.2.2.1.14)
+            $interfaceInErrors = $this->safeSnmpWalk('.1.3.6.1.2.1.2.2.1.14');
+            
+            // 获取接口出错误数 (.1.3.6.1.2.1.2.2.1.20)
+            $interfaceOutErrors = $this->safeSnmpWalk('.1.3.6.1.2.1.2.2.1.20');
+            
+            // 构建接口数据
+            foreach ($interfaceNames as $index => $name) {
+                // 清理索引，例如 ".1.3.6.1.2.1.2.2.1.2.1" 中提取 "1"
+                $idx = explode('.', $index);
+                $interfaceIndex = end($idx);
+                
+                // 只处理操作状态为up的接口
+                $operStatus = isset($interfaceOperStatus[".1.3.6.1.2.1.2.2.1.8.$interfaceIndex"]) 
+                            ? $interfaceOperStatus[".1.3.6.1.2.1.2.2.1.8.$interfaceIndex"] 
+                            : 0;
+                
+                // 排除某些接口类型
+                if (preg_match('/^(Null|Loopback|Vlan|Tunnel)/i', $name) && $operStatus != 1) {
+                    continue;
                 }
-            } else {
-                $interface['oper_status'] = 'unknown';
+                
+                $description = isset($interfaceDescriptions[".1.3.6.1.2.1.31.1.1.1.18.$interfaceIndex"]) 
+                             ? $interfaceDescriptions[".1.3.6.1.2.1.31.1.1.1.18.$interfaceIndex"] 
+                             : '';
+                
+                $speed = isset($interfaceSpeeds[".1.3.6.1.2.1.2.2.1.5.$interfaceIndex"]) 
+                       ? $interfaceSpeeds[".1.3.6.1.2.1.2.2.1.5.$interfaceIndex"] 
+                       : (isset($interfaceSpeeds[".1.3.6.1.2.1.31.1.1.1.15.$interfaceIndex"]) 
+                         ? $interfaceSpeeds[".1.3.6.1.2.1.31.1.1.1.15.$interfaceIndex"] 
+                         : 0);
+                
+                $inOctets = isset($interfaceInOctets[".1.3.6.1.2.1.31.1.1.1.6.$interfaceIndex"]) 
+                          ? $interfaceInOctets[".1.3.6.1.2.1.31.1.1.1.6.$interfaceIndex"] 
+                          : (isset($interfaceInOctets[".1.3.6.1.2.1.2.2.1.10.$interfaceIndex"]) 
+                            ? $interfaceInOctets[".1.3.6.1.2.1.2.2.1.10.$interfaceIndex"] 
+                            : 0);
+                
+                $outOctets = isset($interfaceOutOctets[".1.3.6.1.2.1.31.1.1.1.10.$interfaceIndex"]) 
+                           ? $interfaceOutOctets[".1.3.6.1.2.1.31.1.1.1.10.$interfaceIndex"] 
+                           : (isset($interfaceOutOctets[".1.3.6.1.2.1.2.2.1.16.$interfaceIndex"]) 
+                             ? $interfaceOutOctets[".1.3.6.1.2.1.2.2.1.16.$interfaceIndex"] 
+                             : 0);
+                
+                $inErrors = isset($interfaceInErrors[".1.3.6.1.2.1.2.2.1.14.$interfaceIndex"]) 
+                          ? $interfaceInErrors[".1.3.6.1.2.1.2.2.1.14.$interfaceIndex"] 
+                          : 0;
+                
+                $outErrors = isset($interfaceOutErrors[".1.3.6.1.2.1.2.2.1.20.$interfaceIndex"]) 
+                           ? $interfaceOutErrors[".1.3.6.1.2.1.2.2.1.20.$interfaceIndex"] 
+                           : 0;
+                
+                $interfaceTraffic[$interfaceIndex] = array(
+                    'name' => $name,
+                    'description' => $description,
+                    'status' => $operStatus,
+                    'speed' => $speed,
+                    'in_octets' => $inOctets,
+                    'out_octets' => $outOctets,
+                    'in_errors' => $inErrors,
+                    'out_errors' => $outErrors,
+                    'if_index' => $interfaceIndex
+                );
             }
             
-            $interfaces[$index] = $interface;
+            $endTime = microtime(true);
+            $timeTaken = round($endTime - $startTime, 2);
+            $this->logMessage("标准设备接口流量数据收集完成，共 " . count($interfaceTraffic) . " 个接口，耗时 {$timeTaken} 秒", 3);
+            
+        } catch (Exception $e) {
+            $this->logMessage("收集标准接口流量数据时出错: " . $e->getMessage(), 1);
         }
         
-        return $interfaces;
+        return $interfaceTraffic;
     }
     
     /**
@@ -911,16 +1073,16 @@ class TrafficSNMP {
         $this->logMessage("测试SNMP连接: {$this->host} (社区名: {$this->community})", 3);
         
         // 尝试获取sysObjectID，这是大多数设备都支持的基本OID
-        $result = $this->snmpGet("1.3.6.1.2.1.1.2.0");
+        $result = $this->safeSnmpGet("1.3.6.1.2.1.1.2.0");
         
         // 如果sysObjectID失败，尝试获取sysDescr
         if ($result === false) {
-            $result = $this->snmpGet("1.3.6.1.2.1.1.1.0");
+            $result = $this->safeSnmpGet("1.3.6.1.2.1.1.1.0");
         }
         
         // 如果sysDescr也失败，尝试获取sysUpTime
         if ($result === false) {
-            $result = $this->snmpGet("1.3.6.1.2.1.1.3.0");
+            $result = $this->safeSnmpGet("1.3.6.1.2.1.1.3.0");
         }
         
         // 恢复原始社区名
@@ -934,6 +1096,55 @@ class TrafficSNMP {
             return true;
         } else {
             $this->logMessage("SNMP连接测试失败", 2);
+            return false;
+        }
+    }
+    
+    /**
+     * 安全执行SNMP查询 (GET)，支持超时保护
+     * 
+     * @param string $oid 要查询的OID
+     * @param int $timeout 超时时间（秒）
+     * @return mixed 查询结果，失败返回false
+     */
+    public function safeSnmpGet($oid, $timeout = 5) {
+        // 记录开始时间
+        $start_time = microtime(true);
+        $this->logMessage("开始安全SNMP查询 OID: $oid", 3);
+        
+        try {
+            // 设置SNMP超时保护
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm($timeout);
+            }
+            
+            // 执行查询
+            $result = $this->snmpGet($oid);
+            
+            // 取消超时
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+            
+            // 记录执行时间
+            $end_time = microtime(true);
+            $exec_time = round($end_time - $start_time, 2);
+            
+            // 记录结果
+            if ($result !== false) {
+                $this->logMessage("SNMP查询成功，结果: " . substr(print_r($result, true), 0, 100) . "，耗时 $exec_time 秒", 3);
+            } else {
+                $this->logMessage("SNMP查询失败，耗时 $exec_time 秒", 2);
+            }
+            
+            return $result;
+        } catch (Exception $e) {
+            // 取消超时
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+            
+            $this->logMessage("安全SNMP查询出错: " . $e->getMessage(), 1);
             return false;
         }
     }

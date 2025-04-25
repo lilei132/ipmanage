@@ -854,7 +854,23 @@ class Common_functions  {
 			if (is_string($req) && strpos($req, ':')!==false)
 				$req = strtr($req, ':', '.'); # Default, replace Colon U+003A with Full Stop U+002E.
 
-			$result .= ($changelog===true) ? "[$key]: $req<br>" : " ". $key . ": " . $req . "<br>";
+			// 如果是变更日志，翻译字段名称为中文
+			if($changelog===true) {
+				// 字段名称翻译映射
+				$field_translations = array(
+					'hostname' => '申请人姓名',
+					'description' => '工号',
+					'mac' => '院系/部门',
+					'customer_id' => '存放地点'
+				);
+				
+				// 如果字段有对应的中文名称，则使用中文名称
+				$display_key = isset($field_translations[$key]) ? $field_translations[$key] : $key;
+				$result .= "[$display_key]: $req<br>";
+			}
+			else {
+				$result .= " ". $key . ": " . $req . "<br>";
+			}
 		}
 		return $result;
 	}
@@ -931,29 +947,8 @@ class Common_functions  {
 	 * @return string
 	 */
 	public function reformat_mac_address ($mac, $format = 1) {
-    	// strip al tags first
-    	$mac = strtolower(str_replace(array(":",".","-"), "", $mac));
-    	// format 4
-    	if ($format==4) {
-        	return $mac;
-    	}
-    	// format 3
-    	if ($format==3) {
-        	$mac = str_split($mac, 4);
-        	$mac = implode(".", $mac);
-    	}
-    	// format 2
-    	elseif ($format==2) {
-        	$mac = str_split($mac, 2);
-        	$mac = implode("-", $mac);
-    	}
-    	// format 1
-    	else {
-        	$mac = str_split($mac, 2);
-        	$mac = implode(":", $mac);
-    	}
-    	// return
-    	return $mac;
+		// 由于我们现在使用mac字段存储院系/部门，不进行MAC地址格式化，直接返回原始值
+		return $mac;
 	}
 
 	/**
@@ -1198,15 +1193,11 @@ class Common_functions  {
 	 *
 	 * @access public
 	 * @param mixed $mac
-	 * @return bool
+	 * @return boolean
 	 */
 	public function validate_mac ($mac) {
-    	// first put it to common format (1)
-    	$mac = $this->reformat_mac_address ($mac);
-    	// we permit empty
-        if (is_blank($mac))                                                            { return true; }
-    	elseif (preg_match('/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/', $mac) != 1)   { return false; }
-    	else                                                                            { return true; }
+		// 由于我们现在使用mac字段存储院系/部门，不进行MAC地址验证，始终返回true
+		return true;
 	}
 
     /**

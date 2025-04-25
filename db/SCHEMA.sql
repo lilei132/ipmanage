@@ -1083,3 +1083,46 @@ CREATE TABLE `nominatim_cache` (
 
 UPDATE `settings` SET `version` = "1.74";
 UPDATE `settings` SET `dbversion` = 43;
+
+/* Add port_traffic_history table */
+CREATE TABLE `port_traffic_history` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `device_id` int(11) unsigned NOT NULL,
+  `if_index` varchar(32) NOT NULL,
+  `if_name` varchar(128) NOT NULL,
+  `if_description` varchar(256) DEFAULT NULL,
+  `in_octets` bigint(20) unsigned DEFAULT NULL,
+  `out_octets` bigint(20) unsigned DEFAULT NULL,
+  `in_errors` int(10) unsigned DEFAULT NULL,
+  `out_errors` int(10) unsigned DEFAULT NULL,
+  `speed` bigint(20) unsigned DEFAULT NULL,
+  `oper_status` varchar(32) DEFAULT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `device_id` (`device_id`),
+  KEY `if_index` (`if_index`),
+  KEY `timestamp` (`timestamp`),
+  CONSTRAINT `port_traffic_history_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+/* Add configuration settings for traffic collection */
+INSERT INTO `settings` (`id`, `name`, `value`, `type`, `comment`) VALUES
+(NULL, 'trafficCollection', '0', 'bool', 'Enable traffic data collection'),
+(NULL, 'trafficCollectionInterval', '300', 'int', 'Traffic collection interval in seconds (300 = 5 min)'),
+(NULL, 'trafficHistoryDays', '30', 'int', 'Days to keep traffic history');
+
+/* Add subnet discovery history table */
+CREATE TABLE IF NOT EXISTS `subnet_discovery_history` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `subnet_id` int(11) NOT NULL,
+  `discovery_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `discovered_hosts` int(11) unsigned DEFAULT NULL,
+  `new_hosts` int(11) unsigned DEFAULT NULL,
+  `scan_agent` int(11) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `subnet_id` (`subnet_id`),
+  KEY `discovery_time` (`discovery_time`),
+  KEY `scan_agent` (`scan_agent`),
+  CONSTRAINT `subnet_discovery_history_ibfk_1` FOREIGN KEY (`subnet_id`) REFERENCES `subnets` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

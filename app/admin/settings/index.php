@@ -30,7 +30,7 @@ $(document).ready(function() {
 </script>
 
 <!-- title -->
-<h4><?php print _('phpIPAM Server settings'); ?></h4>
+<h4><?php print _('IP地址管理服务器设置'); ?></h4>
 <hr>
 
 <form name="settings" id="settings">
@@ -741,6 +741,55 @@ $(document).ready(function() {
 	</td>
 </tr>
 
+<!-- OpenStack API -->
+<?php if($User->is_admin(false)) { ?>
+<tr>
+	<td><?php print _('OpenStack API'); ?></td>
+	<td>
+		<input type="checkbox" value="1" class="input-switch" name="enableOpenStack" <?php if($settings['enableOpenStack'] == 1) print 'checked'; ?>>
+	</td>
+	<td class="info2"><?php print _('Enable OpenStack API integration'); ?></td>
+</tr>
+<?php } ?>
+
+<!-- Traffic Collection -->
+<?php if($User->is_admin(false)) { ?>
+<tr>
+	<td><?php print _('流量收集'); ?></td>
+	<td>
+		<input type="checkbox" value="1" class="input-switch" name="trafficCollection" <?php if($settings['trafficCollection'] == 1) print 'checked'; ?>>
+	</td>
+	<td class="info2"><?php print _('启用SNMP端口流量数据收集'); ?></td>
+</tr>
+
+<tr>
+	<td><?php print _('收集时间间隔'); ?></td>
+	<td>
+		<select name="trafficCollectionInterval" class="form-control input-sm input-w-auto">
+			<option value="60" <?php if($settings['trafficCollectionInterval'] == 60) print 'selected'; ?>><?php print _('1分钟'); ?></option>
+			<option value="300" <?php if($settings['trafficCollectionInterval'] == 300) print 'selected'; ?>><?php print _('5分钟'); ?></option>
+			<option value="900" <?php if($settings['trafficCollectionInterval'] == 900) print 'selected'; ?>><?php print _('15分钟'); ?></option>
+			<option value="1800" <?php if($settings['trafficCollectionInterval'] == 1800) print 'selected'; ?>><?php print _('30分钟'); ?></option>
+			<option value="3600" <?php if($settings['trafficCollectionInterval'] == 3600) print 'selected'; ?>><?php print _('1小时'); ?></option>
+		</select>
+	</td>
+	<td class="info2"><?php print _('收集端口流量数据的频率'); ?></td>
+</tr>
+
+<tr>
+	<td><?php print _('历史数据保留'); ?></td>
+	<td>
+		<select name="trafficHistoryDays" class="form-control input-sm input-w-auto">
+			<option value="7" <?php if($settings['trafficHistoryDays'] == 7) print 'selected'; ?>><?php print _('7天'); ?></option>
+			<option value="14" <?php if($settings['trafficHistoryDays'] == 14) print 'selected'; ?>><?php print _('14天'); ?></option>
+			<option value="30" <?php if($settings['trafficHistoryDays'] == 30) print 'selected'; ?>><?php print _('30天'); ?></option>
+			<option value="60" <?php if($settings['trafficHistoryDays'] == 60) print 'selected'; ?>><?php print _('60天'); ?></option>
+			<option value="90" <?php if($settings['trafficHistoryDays'] == 90) print 'selected'; ?>><?php print _('90天'); ?></option>
+		</select>
+	</td>
+	<td class="info2"><?php print _('保留流量历史数据的时间长度'); ?></td>
+</tr>
+<?php } ?>
 
 <!-- result -->
 <tr class="th">

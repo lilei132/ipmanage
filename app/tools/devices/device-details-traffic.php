@@ -251,8 +251,15 @@ if ($if_index !== null) {
                         }
                         ?>
                     </strong>
+                    <div class="pull-right">
+                        <button id="verifyDataBtn" class="btn btn-xs btn-info" title="点击后，您可以在图表上选择任意数据点来验证其与数据库中的真实数据是否匹配">
+                            <i class="fa fa-check-circle"></i> <?php print _("验证数据"); ?>
+                        </button>
+                        <button id="refreshTrafficBtn" class="btn btn-xs btn-default"><i class="fa fa-refresh"></i> <?php print _("Refresh"); ?></button>
+                    </div>
                 </div>
                 <div class="traffic-panel-body">
+                    <div id="traffic-time-range" class="text-muted" style="margin-bottom:10px;font-size:12px;"></div>
                     <div id="traffic-canvas-container" class="traffic-canvas-container"></div>
                 </div>
             </div>
@@ -267,8 +274,53 @@ if ($if_index !== null) {
                 
                 console.log("图表数据已准备:", in_data.length, out_data.length);
                 
+                // 检查是否有数据
+                if (in_data.length === 0 || out_data.length === 0) {
+                    $("#traffic-canvas-container").html(
+                        '<div class="alert alert-warning">' +
+                        '<i class="fa fa-exclamation-triangle"></i> <?php print _("没有找到流量数据。请确保设备SNMP已配置，且流量收集服务正在运行。"); ?>' +
+                        '</div>'
+                    );
+                    return;
+                }
+                
+                // 显示时间范围
+                function updateTimeRange() {
+                    if (in_data.length > 0) {
+                        var firstTime = new Date(in_data[0][0]);
+                        var lastTime = new Date(in_data[in_data.length-1][0]);
+                        
+                        // 格式化为 MM-DD HH:MM
+                        var formatTime = function(date) {
+                            return (date.getMonth() + 1) + '-' + date.getDate() + ' ' + 
+                                   date.getHours() + ':' + (date.getMinutes() < 10 ? '0' : '') + date.getMinutes();
+                        };
+                        
+                        $("#traffic-time-range").html(
+                            "<strong><?php print _("Data Range"); ?>:</strong> " + 
+                            formatTime(firstTime) + " → " + formatTime(lastTime)
+                        );
+                    }
+                }
+                
                 // 创建并绘制图表
                 createTrafficChart(in_data, out_data);
+                updateTimeRange();
+                
+                // 处理刷新按钮点击
+                $("#refreshTrafficBtn").click(function(e) {
+                    e.preventDefault();
+                    
+                    // 显示加载状态
+                    var $btn = $(this);
+                    $btn.html('<i class="fa fa-spinner fa-spin"></i> <?php print _("Loading..."); ?>').prop('disabled', true);
+                    
+                    // 重新加载页面，添加时间戳防止缓存
+                    window.location.href = window.location.pathname + 
+                                          window.location.search + 
+                                          (window.location.search.indexOf('?') >= 0 ? '&' : '?') + 
+                                          '_=' + new Date().getTime();
+                });
                 
                 // 添加缩放信息提示
                 $("#traffic-canvas-container").after(

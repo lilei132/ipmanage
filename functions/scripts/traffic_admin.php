@@ -1,6 +1,6 @@
 <?php
 /**
- * phpIPAM 流量采集管理脚本
+ * IP地址管理 流量采集管理脚本
  * 
  * 功能：
  * - 查看当前流量采集配置
@@ -48,6 +48,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
+        // 修改日志级别
+        if (isset($_POST['log_level']) && is_numeric($_POST['log_level'])) {
+            $log_level = intval($_POST['log_level']);
+            if ($log_level >= 0 && $log_level <= 4) {
+                set_traffic_config('log_level', $log_level);
+                $message .= "，日志级别已更新";
+            }
+        }
+        
+        // 修改详细日志设置
+        if (isset($_POST['verbose_logging'])) {
+            $verbose = ($_POST['verbose_logging'] === 'on');
+            set_traffic_config('verbose_logging', $verbose);
+            $message .= "，详细日志设置已更新";
+        }
+        
+        // 修改日志格式
+        if (isset($_POST['log_format'])) {
+            $log_format = $_POST['log_format'];
+            if (in_array($log_format, ['text', 'json'])) {
+                set_traffic_config('log_format', $log_format);
+                $message .= "，日志格式已更新";
+            }
+        }
+        
+        // 修改日志文件模式
+        if (isset($_POST['log_file_pattern'])) {
+            $log_file_pattern = $_POST['log_file_pattern'];
+            if (in_array($log_file_pattern, ['daily', 'hourly', 'single'])) {
+                set_traffic_config('log_file_pattern', $log_file_pattern);
+                $message .= "，日志文件模式已更新";
+            }
+        }
+        
+        // 修改最大日志大小
+        if (isset($_POST['max_log_size']) && is_numeric($_POST['max_log_size'])) {
+            $size = intval($_POST['max_log_size']) * 1024 * 1024; // 转换为字节
+            if ($size > 0) {
+                set_traffic_config('max_log_size', $size);
+                $message .= "，最大日志大小已更新";
+            }
+        }
+        
+        // 修改最大日志文件数
+        if (isset($_POST['max_log_files']) && is_numeric($_POST['max_log_files'])) {
+            $count = intval($_POST['max_log_files']);
+            if ($count > 0) {
+                set_traffic_config('max_log_files', $count);
+                $message .= "，最大日志文件数已更新";
+            }
+        }
+        
+        // 修改日志压缩设置
+        if (isset($_POST['compress_logs'])) {
+            $compress = ($_POST['compress_logs'] === 'on');
+            set_traffic_config('compress_logs', $compress);
+            $message .= "，日志压缩设置已更新";
+        }
+        
         // 保存配置到数据库
         if (save_traffic_config_to_db($database)) {
             $success = true;
@@ -79,6 +138,11 @@ $collection_interval = get_traffic_config('collection_interval', 5);
 $data_retention_days = get_traffic_config('data_retention_days', 30);
 $verbose_logging = get_traffic_config('verbose_logging', true);
 $log_level = get_traffic_config('log_level', 3);
+$log_format = get_traffic_config('log_format', 'text');
+$log_file_pattern = get_traffic_config('log_file_pattern', 'daily');
+$max_log_size = get_traffic_config('max_log_size', 10 * 1024 * 1024) / (1024 * 1024); // 转换为MB
+$max_log_files = get_traffic_config('max_log_files', 30);
+$compress_logs = get_traffic_config('compress_logs', true);
 
 // 获取cron设置
 $cron_output = [];
@@ -116,7 +180,7 @@ if (!empty($query2)) {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>phpIPAM 流量采集管理</title>
+    <title>IP地址管理 流量采集管理</title>
     <meta charset="utf-8">
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; color: #333; }
@@ -139,7 +203,7 @@ if (!empty($query2)) {
 </head>
 <body>
     <div class="container">
-        <h1>phpIPAM 流量采集管理</h1>
+        <h1>IP地址管理 流量采集管理</h1>
         
         <?php if (isset($message)): ?>
             <div class="card <?php echo isset($success) && $success ? 'success' : 'error'; ?>">
@@ -157,6 +221,46 @@ if (!empty($query2)) {
                 
                 <label for="data_retention_days">数据保留时间 (天):</label>
                 <input type="number" id="data_retention_days" name="data_retention_days" value="<?php echo $data_retention_days; ?>" min="1">
+                
+                <h3>日志设置</h3>
+                
+                <label for="log_level">日志级别:</label>
+                <select id="log_level" name="log_level">
+                    <option value="0" <?php echo $log_level == 0 ? 'selected' : ''; ?>>关闭日志</option>
+                    <option value="1" <?php echo $log_level == 1 ? 'selected' : ''; ?>>仅错误</option>
+                    <option value="2" <?php echo $log_level == 2 ? 'selected' : ''; ?>>错误和警告</option>
+                    <option value="3" <?php echo $log_level == 3 ? 'selected' : ''; ?>>错误、警告和信息</option>
+                    <option value="4" <?php echo $log_level == 4 ? 'selected' : ''; ?>>全部（包括调试）</option>
+                </select>
+                
+                <div style="margin: 10px 0;">
+                    <input type="checkbox" id="verbose_logging" name="verbose_logging" <?php echo $verbose_logging ? 'checked' : ''; ?>>
+                    <label for="verbose_logging" style="display: inline;">在控制台输出详细日志</label>
+                </div>
+                
+                <label for="log_format">日志格式:</label>
+                <select id="log_format" name="log_format">
+                    <option value="text" <?php echo $log_format == 'text' ? 'selected' : ''; ?>>文本格式</option>
+                    <option value="json" <?php echo $log_format == 'json' ? 'selected' : ''; ?>>JSON格式</option>
+                </select>
+                
+                <label for="log_file_pattern">日志文件模式:</label>
+                <select id="log_file_pattern" name="log_file_pattern">
+                    <option value="daily" <?php echo $log_file_pattern == 'daily' ? 'selected' : ''; ?>>按天（traffic_collector_20250408.log）</option>
+                    <option value="hourly" <?php echo $log_file_pattern == 'hourly' ? 'selected' : ''; ?>>按小时（traffic_collector_2025040810.log）</option>
+                    <option value="single" <?php echo $log_file_pattern == 'single' ? 'selected' : ''; ?>>单文件（traffic_collector.log）</option>
+                </select>
+                
+                <label for="max_log_size">最大日志文件大小 (MB):</label>
+                <input type="number" id="max_log_size" name="max_log_size" value="<?php echo $max_log_size; ?>" min="1">
+                
+                <label for="max_log_files">保留日志文件数量:</label>
+                <input type="number" id="max_log_files" name="max_log_files" value="<?php echo $max_log_files; ?>" min="1">
+                
+                <div style="margin: 10px 0;">
+                    <input type="checkbox" id="compress_logs" name="compress_logs" <?php echo $compress_logs ? 'checked' : ''; ?>>
+                    <label for="compress_logs" style="display: inline;">压缩旧日志文件</label>
+                </div>
                 
                 <button type="submit">保存设置</button>
             </form>

@@ -90,7 +90,27 @@ elseif(isset($GET->subnetId)) {
         elseif($GET->sPage=="circuits") {
             include("device-details/device-circuits.php");
         }
+        elseif($GET->sPage=="traffic") {
+            // 检查流量页面文件是否存在
+            if(file_exists(dirname(__FILE__)."/device-traffic.php")) {
+                include("device-traffic.php");
+            }
+            else {
+                $Result->show("danger", _("Device traffic file could not be found")."!", true);
+            }
+        }
     }
 } else {
 	include('all-devices.php');
 }
+
+// 检查页面
+if(!isset($_GET['sPage'])) { $_GET['sPage'] = ""; }
+
+// 根据不同页面选择要载入的页面
+if(!isset($_GET['subnetId'])) 		{ include("all-devices.php"); }
+// 具体设备详情页面
+elseif($_GET['sPage'] == "")            { include("device-details/device-details.php"); }
+// 子页面
+elseif($_GET['sPage'] == "device-details-traffic") { include("device-details/device-traffic.php"); }
+else                                                            { include("device-details/device-details-$_GET[sPage].php"); }

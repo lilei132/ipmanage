@@ -771,6 +771,7 @@ $(document).ready(function() {
                 if (nearestPoint) {
                     // 显示提示框
                     const date = new Date(nearestPoint.timestamp);
+                    console.log("工具提示时间戳:", nearestPoint.timestamp, "格式化时间:", date.toLocaleString());
                     const formattedDate = formatDate(date);
                     const formattedTime = formatTime(date);
                     const value = formatBits(nearestPoint.value);
@@ -1112,10 +1113,11 @@ $(document).ready(function() {
             data: {
                 deviceId: card.deviceId,
                 interfaceId: card.interfaceId,
-                timespan: card.timespan
+                timespan: card.timespan,
+                _: new Date().getTime() // 添加时间戳参数防止缓存
             },
             dataType: 'json',
-            cache: false,
+            cache: false, // 确保不使用缓存
             success: function(response) {
                 try {
                     console.log('流量数据响应:', response);
@@ -1124,6 +1126,13 @@ $(document).ready(function() {
                     const isRawData = response && response.raw === true;
                     if (isRawData) {
                         console.log('检测到原始数据标记，将使用未经平滑处理的数据点');
+                    }
+                    
+                    // 强制刷新时间范围显示
+                    if (response && response.in_data && response.in_data.length > 0) {
+                        const firstPoint = response.in_data[0];
+                        const lastPoint = response.in_data[response.in_data.length - 1];
+                        console.log('数据时间范围:', new Date(firstPoint[0]), '至', new Date(lastPoint[0]));
                     }
                     
                     // 接口一：对象格式，有success标志

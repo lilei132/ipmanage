@@ -279,11 +279,22 @@ if ($Scan->icmp_type == "fping") {
                 // online -- set new available time
                 $addresses[$index]['lastSeenNew'] =  $nowdate;
                 $address_change[$index] = $addresses[$index];
+                
+                // 记录日志 - IP地址响应成功
+                if ($Scan->get_debugging()) {
+                    print "pingCheck: IP ".$Subnets->transform_to_dotted($addresses[$index]['ip_addr'])." is online, lastSeen updated to $nowdate\n";
+                }
             } else {
                 // offline -- set to offline
                 $addresses[$index]['lastSeenNew'] =  NULL;
                 $address_change[$index] = $addresses[$index];
+                
+                // 记录日志 - IP地址无响应
+                if ($Scan->get_debugging()) {
+                    print "pingCheck: IP ".$Subnets->transform_to_dotted($addresses[$index]['ip_addr'])." is offline\n";
+                }
             }
+            
             //save exit code for host
             $addresses[$index]['newStatus'] = ($code === 0) ? 0 : 1;
         }

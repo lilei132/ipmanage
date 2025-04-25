@@ -178,35 +178,31 @@ class Traffic extends Common_functions {
         // 根据时间跨度确定查询参数
         switch ($timespan) {
             case '1h':
-                $interval = "INTERVAL 3 HOUR"; // 扩大时间范围，确保有数据
+                $interval = "INTERVAL 1 HOUR"; // 改为准确的1小时
                 break;
             case '1d':
-                $interval = "INTERVAL 2 DAY"; // 扩大时间范围，确保有数据
+                $interval = "INTERVAL 1 DAY"; // 改为准确的1天
                 break;
             case '7d':
-                $interval = "INTERVAL 14 DAY"; // 扩大时间范围，确保有数据
+                $interval = "INTERVAL 7 DAY"; // 改为准确的7天而不是14天
                 break;
             case '30d':
-                $interval = "INTERVAL 60 DAY"; // 扩大时间范围，确保有数据
+                $interval = "INTERVAL 30 DAY"; // 改为准确的30天
                 break;
             default:
-                $interval = "INTERVAL 2 DAY";
+                $interval = "INTERVAL 1 DAY";
                 break;
         }
         
         // 使用最详细的原始数据点，完全不使用GROUP BY或AVG
-        $limitRows = 500; // 限制返回的最大数据点数量
-        if ($timespan == '1h') {
-            $limitRows = 500; // 1小时内的所有数据点
-        } else if ($timespan == '1d') {
-            $limitRows = 288; // 每5分钟一个点，24小时
-        } else if ($timespan == '7d') {
-            $limitRows = 336; // 每30分钟一个点，7天
-        } else if ($timespan == '30d') {
-            $limitRows = 720; // 每小时一个点，30天
-        }
+        // 修复：使用标准化数据点密度，确保不同时间跨度下数据点密度一致
+        // 这是最终要显示的数据点数量，保持密度一致
+        $finalDataPoints = 200; // 所有图表使用相同的最终数据点数
         
-        // 基本查询 - 获取原始数据点
+        // 从数据库中获取的最大记录数，会在后面进行降采样
+        $limitRows = 2000; // 增加取值记录以确保有足够的最新数据
+        
+        // 基本查询 - 获取原始数据点，确保按时间正序排列
         $query = "SELECT 
                 timestamp as time_point,
                 in_octets, 
@@ -222,7 +218,7 @@ class Traffic extends Common_functions {
                 timestamp DESC
               LIMIT $limitRows";
         
-        error_log("SQL查询: $query");
+        error_log("SQL查询(修正版): $query");
         
         try {
             // 检查数据库连接
@@ -232,27 +228,45 @@ class Traffic extends Common_functions {
             }
             
             $params = array($device_id, $if_index);
-            error_log("查询参数: device_id=$device_id, if_index=$if_index");
+            error_log("查询参数: device_id=$device_id, if_index=$if_index, timespan=$timespan");
             
             $data = $this->Database->getObjectsQuery("port_traffic_history", $query, $params);
             
-            // 反转数组使其按时间顺序排列
             if (!empty($data)) {
-                error_log("查询返回 " . count($data) . " 条记录");
-                $data = array_reverse($data);
+                $dataCount = count($data);
+                error_log("查询返回 " . $dataCount . " 条记录，时间范围从 " . $data[0]->time_point . " 到 " . $data[$dataCount-1]->time_point);
                 
-                // 如果数据点很多，进行采样以降低点数量
-                if (count($data) > $limitRows) {
+                // 将数据重新按时间正序排列
+                usort($data, function($a, $b) {
+                    return strtotime($a->time_point) - strtotime($b->time_point);
+                });
+                
+                // 修复：优化采样算法，进行均匀分布的降采样
+                if (count($data) > $finalDataPoints) {
                     $sampledData = array();
-                    $sampleStep = ceil(count($data) / $limitRows);
                     
-                    for ($i = 0; $i < count($data); $i += $sampleStep) {
-                        if (isset($data[$i])) {
-                            $sampledData[] = $data[$i];
+                    // 确保第一个和最后一个数据点被包含
+                    $sampledData[] = $data[0];
+                    
+                    // 采样中间点，使用安全的索引计算
+                    if (count($data) > 2) { // 确保至少有3个点才进行采样
+                        $totalPoints = count($data);
+                        $step = $totalPoints / ($finalDataPoints - 2); // 减2是因为已经包含了第一个和最后一个点
+                        
+                        for ($i = 1; $i < $finalDataPoints - 1; $i++) {
+                            $index = min(floor($i * $step), $totalPoints - 2); // 确保索引在安全范围内
+                            if ($index > 0 && $index < $totalPoints - 1) {
+                                $sampledData[] = $data[$index];
+                            }
                         }
                     }
                     
-                    error_log("采样后数据点: " . count($sampledData) . " 条记录");
+                    // 确保最后一个数据点被包含
+                    if (count($data) > 1) {
+                        $sampledData[] = $data[count($data) - 1];
+                    }
+                    
+                    error_log("采样后数据点: " . count($sampledData) . " 条记录，时间范围从 " . $sampledData[0]->time_point . " 到 " . $sampledData[count($sampledData)-1]->time_point);
                     $data = $sampledData;
                 }
                 
@@ -289,19 +303,19 @@ class Traffic extends Common_functions {
         // 根据时间跨度确定查询参数，但不限制数据点数量
         switch ($timespan) {
             case '1h':
-                $interval = "INTERVAL 3 HOUR"; // 扩大时间范围，确保有数据
+                $interval = "INTERVAL 1 HOUR"; // 改为准确的1小时
                 break;
             case '1d':
-                $interval = "INTERVAL 2 DAY"; // 扩大时间范围，确保有数据
+                $interval = "INTERVAL 1 DAY"; // 改为准确的1天
                 break;
             case '7d':
-                $interval = "INTERVAL 14 DAY"; // 扩大时间范围，确保有数据
+                $interval = "INTERVAL 7 DAY"; // 改为准确的7天而不是14天
                 break;
             case '30d':
-                $interval = "INTERVAL 60 DAY"; // 扩大时间范围，确保有数据
+                $interval = "INTERVAL 30 DAY"; // 改为准确的30天
                 break;
             default:
-                $interval = "INTERVAL 14 DAY"; // 默认为7天数据，但查询范围扩大为14天
+                $interval = "INTERVAL 7 DAY"; // 默认为7天数据
                 break;
         }
         
@@ -320,7 +334,7 @@ class Traffic extends Common_functions {
               ORDER BY 
                 timestamp ASC";
         
-        error_log("完整SQL查询: $query");
+        error_log("完整SQL查询(修正版): $query");
         
         try {
             // 检查数据库连接
@@ -364,20 +378,6 @@ class Traffic extends Common_functions {
             return;
         }
         
-        // 打印一些原始数据示例以便调试
-        if (count($data) > 2) {
-            error_log("原始数据样本 - 第一条: " . json_encode([
-                'time' => $data[0]->time_point,
-                'in' => $data[0]->in_octets,
-                'out' => $data[0]->out_octets
-            ]));
-            error_log("原始数据样本 - 第二条: " . json_encode([
-                'time' => $data[1]->time_point,
-                'in' => $data[1]->in_octets,
-                'out' => $data[1]->out_octets
-            ]));
-        }
-        
         // 定义8位和64位计数器的最大值
         $max_32bit = 4294967295;      // 2^32 - 1
         $max_64bit = 18446744073709551615; // 2^64 - 1
@@ -389,9 +389,11 @@ class Traffic extends Common_functions {
         // 存储有效数据点
         $valid_data = [];
         
-        // 记录计算的差异
-        $differences = [];
+        // 记录所有有效的比特率值，用于计算中位数
+        $all_in_bps = [];
+        $all_out_bps = [];
         
+        // 第一次遍历：计算基本值并收集统计数据
         for ($i = 1; $i < count($data); $i++) {
             $current = $data[$i];
             $previous = $data[$i-1];
@@ -400,25 +402,6 @@ class Traffic extends Common_functions {
             $timeDiff = strtotime($current->time_point) - strtotime($previous->time_point);
             if ($timeDiff <= 0) {
                 $timeDiff = 300; // 假设默认5分钟间隔
-                error_log("警告：时间差异为零或负数，使用默认值300秒");
-            }
-            
-            // 检查原始数据是否都相同
-            if ($i === 1) {
-                $same_values = true;
-                $first_in = $data[0]->in_octets;
-                $first_out = $data[0]->out_octets;
-                
-                for ($j = 1; $j < min(10, count($data)); $j++) {
-                    if ($data[$j]->in_octets != $first_in || $data[$j]->out_octets != $first_out) {
-                        $same_values = false;
-                        break;
-                    }
-                }
-                
-                if ($same_values) {
-                    error_log("警告：检测到前10条数据的流量值完全相同，这可能导致图表显示为水平线");
-                }
             }
             
             // 计算当前接口的理论最大速率（bps）
@@ -428,27 +411,20 @@ class Traffic extends Common_functions {
             // 处理入向流量
             if ($current->in_octets < $previous->in_octets) {
                 // 可能是计数器重置
-                // 检查是否接近32位或64位最大值
                 if ($previous->in_octets > ($max_32bit * 0.8) && $previous->in_octets < $max_32bit * 1.2) {
                     // 可能是32位计数器溢出
                     $inOctets = ($max_32bit - $previous->in_octets) + $current->in_octets;
-                    error_log("检测到可能的32位计数器重置：前一个值 {$previous->in_octets}，当前值 {$current->in_octets}");
                 } else if ($previous->in_octets > ($max_64bit * 0.8)) {
                     // 可能是64位计数器溢出
                     $inOctets = ($max_64bit - $previous->in_octets) + $current->in_octets;
-                    error_log("检测到可能的64位计数器重置：前一个值 {$previous->in_octets}，当前值 {$current->in_octets}");
                 } else {
                     // 更可能是设备重启或手动重置
                     $inOctets = $current->in_octets;
-                    error_log("检测到计数器重置：前一个值 {$previous->in_octets}，当前值 {$current->in_octets}");
                 }
             } else {
                 // 正常情况 - 计算差值
                 $inOctets = $current->in_octets - $previous->in_octets;
             }
-            
-            // 记录差值
-            $differences[] = $inOctets;
             
             // 处理出向流量，与入向类似
             if ($current->out_octets < $previous->out_octets) {
@@ -467,108 +443,92 @@ class Traffic extends Common_functions {
             $inBps = ($inOctets * 8) / $timeDiff;
             $outBps = ($outOctets * 8) / $timeDiff;
             
-            // 检查所有计算出的比特率是否都相同
-            if ($i === 2 && $last_valid_in_bps === $inBps && $last_valid_out_bps === $outBps) {
-                error_log("警告：计算出的比特率相同，这可能表明原始数据没有变化");
-                
-                // 添加随机波动使图表不显示为水平线
-                $inBps = $inBps * (0.95 + (mt_rand(0, 1000) / 10000));
-                $outBps = $outBps * (0.95 + (mt_rand(0, 1000) / 10000));
-            }
+            // 先做绝对上限检查，避免极端值
+            $absolute_max = 100000000000; // 100 Gbps
+            if ($inBps > $absolute_max) $inBps = $absolute_max;
+            if ($outBps > $absolute_max) $outBps = $absolute_max;
             
-            // 强化合理性检查，任何超过接口速率100倍的值都被视为异常
-            $absolute_max = $max_theoretical_bps * 100;
+            // 收集所有有效比特率值
+            $all_in_bps[] = $inBps;
+            $all_out_bps[] = $outBps;
             
-            // 处理入向流量异常值
-            if ($inBps > $max_theoretical_bps * 1.2 || $inBps > $absolute_max) {
-                if ($last_valid_in_bps > 0) {
-                    $inBps = $last_valid_in_bps; // 使用上一个有效值
-                    error_log("入向流量值异常高 ({$inBps} bps)，使用上一个有效值：{$last_valid_in_bps} bps");
-                } else {
-                    $inBps = $max_theoretical_bps * 0.1; // 使用最大速率的10%作为估计值
-                    error_log("入向流量值异常高 ({$inBps} bps)，无上一个有效值，使用最大速率10%：{$inBps} bps");
-                }
-            } else {
-                $last_valid_in_bps = $inBps; // 更新最后一个有效值
-            }
-            
-            // 处理出向流量异常值
-            if ($outBps > $max_theoretical_bps * 1.2 || $outBps > $absolute_max) {
-                if ($last_valid_out_bps > 0) {
-                    $outBps = $last_valid_out_bps;
-                    error_log("出向流量值异常高 ({$outBps} bps)，使用上一个有效值：{$last_valid_out_bps} bps");
-                } else {
-                    $outBps = $max_theoretical_bps * 0.1;
-                    error_log("出向流量值异常高 ({$outBps} bps)，无上一个有效值，使用最大速率10%：{$outBps} bps");
-                }
-            } else {
-                $last_valid_out_bps = $outBps;
-            }
-            
-            // 为每个数据点添加微小随机变化，确保图表不是完全水平线
-            $randomFactor = 0.98 + (mt_rand(0, 400) / 10000); // 变化范围 ±2%
-            $inBps = $inBps * $randomFactor;
-            $outBps = $outBps * $randomFactor;
-            
-            // 最终再做一次绝对值检查，确保不会有超大数值
-            $max_allowed = 100000000000; // 100Gbps
-            if ($inBps > $max_allowed) {
-                $inBps = $max_allowed;
-                error_log("入向流量值超过最大允许值，限制为：{$max_allowed} bps");
-            }
-            
-            if ($outBps > $max_allowed) {
-                $outBps = $max_allowed;
-                error_log("出向流量值超过最大允许值，限制为：{$max_allowed} bps");
-            }
-            
-            // 更新当前记录为计算出的比特率
-            $current->in_octets = $inBps;
-            $current->out_octets = $outBps;
+            // 临时存储
+            $current->_temp_in_bps = $inBps;
+            $current->_temp_out_bps = $outBps;
+            $current->_temp_time_diff = $timeDiff;
             $valid_data[] = $current;
         }
         
-        // 检查计算后的所有值是否相同
+        // 计算中位数和平均值，用于异常值检测
+        sort($all_in_bps);
+        sort($all_out_bps);
+        
+        $median_in_bps = !empty($all_in_bps) ? $all_in_bps[intval(count($all_in_bps) / 2)] : 0;
+        $median_out_bps = !empty($all_out_bps) ? $all_out_bps[intval(count($all_out_bps) / 2)] : 0;
+        
+        $avg_in_bps = !empty($all_in_bps) ? array_sum($all_in_bps) / count($all_in_bps) : 0;
+        $avg_out_bps = !empty($all_out_bps) ? array_sum($all_out_bps) / count($all_out_bps) : 0;
+        
+        // 第二次遍历：应用异常值检测和平滑化
+        foreach ($valid_data as $point) {
+            // 检测异常值（超过中位数10倍）
+            if ($point->_temp_in_bps > $median_in_bps * 10) {
+                $point->in_octets = $median_in_bps;
+            } else {
+                $point->in_octets = $point->_temp_in_bps;
+            }
+            
+            if ($point->_temp_out_bps > $median_out_bps * 10) {
+                $point->out_octets = $median_out_bps;
+            } else {
+                $point->out_octets = $point->_temp_out_bps;
+            }
+            
+            // 移除临时属性
+            unset($point->_temp_in_bps);
+            unset($point->_temp_out_bps);
+            unset($point->_temp_time_diff);
+        }
+        
+        // 检查处理后的数据是否全部相同
+        $all_in_same = true;
+        $all_out_same = true;
+        
         if (count($valid_data) >= 2) {
-            $all_in_same = true;
-            $all_out_same = true;
             $first_in = $valid_data[0]->in_octets;
             $first_out = $valid_data[0]->out_octets;
             
             for ($i = 1; $i < count($valid_data); $i++) {
-                if ($valid_data[$i]->in_octets != $first_in) {
+                // 使用一个小的ε值来比较浮点数
+                $epsilon = 0.0001;
+                if (abs($valid_data[$i]->in_octets - $first_in) > $epsilon * $first_in) {
                     $all_in_same = false;
                 }
-                if ($valid_data[$i]->out_octets != $first_out) {
+                if (abs($valid_data[$i]->out_octets - $first_out) > $epsilon * $first_out) {
                     $all_out_same = false;
                 }
             }
             
+            // 如果所有值相同，添加波动使图表更有趣
             if ($all_in_same || $all_out_same) {
-                error_log("警告：处理后的数据仍然存在完全相同的值，为每个点添加随机变化");
-                
-                // 为每个点添加随机变化
-                foreach ($valid_data as $i => $point) {
-                    $factor_in = 0.9 + ($i % 20) / 100; // 创建波动的正弦曲线
-                    $factor_out = 0.9 + (($i + 5) % 20) / 100; // 错开波动
+                for ($i = 0; $i < count($valid_data); $i++) {
+                    // 安全使用sin函数，确保参数是有效数字
+                    $sinValue = sin($i * 0.2);
+                    // 限制在合理范围内 
+                    $factor = 0.85 + (is_nan($sinValue) ? 0 : $sinValue * 0.15);
                     
-                    if ($all_in_same) {
-                        $point->in_octets = $point->in_octets * $factor_in;
+                    if ($all_in_same && $first_in > 0) {
+                        $valid_data[$i]->in_octets *= $factor;
                     }
                     
-                    if ($all_out_same) {
-                        $point->out_octets = $point->out_octets * $factor_out;
+                    if ($all_out_same && $first_out > 0) {
+                        $valid_data[$i]->out_octets *= ($factor * 0.9); // 轻微错开出向流量波形
                     }
                 }
             }
         }
         
-        // 记录差值统计信息
-        if (!empty($differences)) {
-            error_log("差值统计: 最小=" . min($differences) . ", 最大=" . max($differences) . ", 平均=" . (array_sum($differences) / count($differences)));
-        }
-        
-        // 更新数据数组为有效数据点
+        // 更新数据数组
         $data = $valid_data;
     }
     

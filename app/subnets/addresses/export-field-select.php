@@ -58,13 +58,13 @@ print "	</tr>";
 
 # description - mandatory
 print "	<tr>";
-print "	<td>"._('Description')."</td>";
+print "	<td>"._('工号')."</td>";
 print "	<td><input type='checkbox' name='description' checked> </td>";
 print "	</tr>";
 
 # hostname - mandatory
 print "	<tr>";
-print "	<td>"._('Hostname')."</td>";
+print "	<td>"._('申请人姓名')."</td>";
 print "	<td><input type='checkbox' name='hostname' checked> </td>";
 print "	</tr>";
 
@@ -76,7 +76,7 @@ print "	</tr>";
 
 # mac
 print "	<tr>";
-print "	<td>"._('MAC address')."</td>";
+print "	<td>"._('院系/部门')."</td>";
 print "	<td><input type='checkbox' name='mac' checked> </td>";
 print "	</tr>";
 
@@ -113,6 +113,12 @@ print "	<td>"._('Location')."</td>";
 print "	<td><input type='checkbox' name='location' checked> </td>";
 print "	</tr>";
 }
+
+# customer_id
+print "	<tr>";
+print "	<td>"._('存放地点')."</td>";
+print "	<td><input type='checkbox' name='customer_id' checked> </td>";
+print "	</tr>";
 
 # get all custom fields
 $custom_fields = $Tools->fetch_custom_fields ('ipaddresses');
