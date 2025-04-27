@@ -1202,152 +1202,68 @@ $(document).ready(function() {
     // 处理流量数据
     function processTrafficData(card, inData, outData, speed, isRawData = false) {
         try {
-            console.log('处理流量数据，原始数据点数:', inData.length, outData.length);
+            // 数据有效性检查
+            const validInData = inData?.filter(point => Array.isArray(point) && point.length === 2 && point[0] !== null && point[1] !== null) || [];
+            const validOutData = outData?.filter(point => Array.isArray(point) && point.length === 2 && point[0] !== null && point[1] !== null) || [];
             
-            // 打印数据样本用于调试
-            if (inData.length > 0) {
-                console.log('入流量数据样本(前5个):', inData.slice(0, 5));
-            }
-            if (outData.length > 0) {
-                console.log('出流量数据样本(前5个):', outData.slice(0, 5));
-            }
-            
-            // 检查数据点是否完全相同 - 这可能导致水平线
-            let allSameIn = true;
-            let allSameOut = true;
-            let firstInValue = inData.length > 0 ? inData[0][1] : null;
-            let firstOutValue = outData.length > 0 ? outData[0][1] : null;
-            
-            // 检查入流量数据点是否全部相同
-            for (let i = 1; i < inData.length; i++) {
-                if (inData[i][1] !== firstInValue) {
-                    allSameIn = false;
-                    break;
-                }
-            }
-            
-            // 检查出流量数据点是否全部相同
-            for (let i = 1; i < outData.length; i++) {
-                if (outData[i][1] !== firstOutValue) {
-                    allSameOut = false;
-                    break;
-                }
-            }
-            
-            // 如果所有数据点都相同，添加一些小变化以避免完全水平线
-            if (allSameIn && inData.length > 1) {
-                console.warn('检测到所有入流量数据点值相同，添加小变化');
-                inData = inData.map((point, i) => {
-                    // 添加微小波动
-                    const variation = (Math.sin(i * 0.2) * 0.05 + 1) * point[1];
-                    return [point[0], variation];
-                });
-            }
-            
-            if (allSameOut && outData.length > 1) {
-                console.warn('检测到所有出流量数据点值相同，添加小变化');
-                outData = outData.map((point, i) => {
-                    // 添加微小波动
-                    const variation = (Math.sin(i * 0.2) * 0.05 + 1) * point[1];
-                    return [point[0], variation];
-                });
-            }
-            
-            // 检查和过滤空数据
-            const filteredInData = inData.filter(point => 
-                Array.isArray(point) && point.length === 2 && point[0] !== null && point[1] !== null
-            );
-            const filteredOutData = outData.filter(point => 
-                Array.isArray(point) && point.length === 2 && point[0] !== null && point[1] !== null
-            );
-            
-            console.log('过滤后数据点数:', filteredInData.length, filteredOutData.length);
-            
-            // 检查时间戳是否有重复，如果有重复的时间戳，则只保留最后一个
-            const uniqueInData = [];
-            const seenTimestampsIn = {};
-            filteredInData.forEach(point => {
-                seenTimestampsIn[point[0]] = point;
-            });
-            
-            for (const timestamp in seenTimestampsIn) {
-                uniqueInData.push(seenTimestampsIn[timestamp]);
-            }
-            
-            const uniqueOutData = [];
-            const seenTimestampsOut = {};
-            filteredOutData.forEach(point => {
-                seenTimestampsOut[point[0]] = point;
-            });
-            
-            for (const timestamp in seenTimestampsOut) {
-                uniqueOutData.push(seenTimestampsOut[timestamp]);
-            }
-            
-            console.log('去重后数据点数:', uniqueInData.length, uniqueOutData.length);
-            
-            // 确保数据按时间戳排序
-            const sortedInData = uniqueInData.sort((a, b) => a[0] - b[0]);
-            const sortedOutData = uniqueOutData.sort((a, b) => a[0] - b[0]);
-            
-            let finalInData, finalOutData;
-            
-            // 根据是否为原始数据决定是否进行平滑处理和异常值处理
-            if (isRawData) {
-                console.log('使用原始数据点，跳过平滑处理');
-                // 直接使用排序后的数据，只进行异常值检查
-                finalInData = checkExtremeValues(sortedInData);
-                finalOutData = checkExtremeValues(sortedOutData);
-        } else {
-                // 数据平滑处理
-                const smoothedInData = smoothDataPoints(sortedInData);
-                const smoothedOutData = smoothDataPoints(sortedOutData);
+            // 检查数据点是否全部相同，如果是则添加微小波动
+            const addVariationIfNeeded = (data) => {
+                if (data.length < 2) return data;
                 
-                // 检测和处理计数器重置或异常值
-                const processedInData = handleCounterResets(smoothedInData);
-                const processedOutData = handleCounterResets(smoothedOutData);
+                const firstValue = data[0][1];
+                const allSame = data.every(point => point[1] === firstValue);
                 
-                // 检查和处理异常大的流量值
-                finalInData = checkExtremeValues(processedInData);
-                finalOutData = checkExtremeValues(processedOutData);
-            }
+                if (allSame) {
+                    return data.map((point, i) => [point[0], (Math.sin(i * 0.2) * 0.05 + 1) * point[1]]);
+                }
+                return data;
+            };
             
-            console.log('最终处理后数据点数:', finalInData.length, finalOutData.length);
+            // 去除重复时间戳的数据点
+            const deduplicatePoints = (data) => {
+                const seen = {};
+                data.forEach(point => seen[point[0]] = point);
+                return Object.values(seen);
+            };
+            
+            // 处理数据
+            let finalInData = validInData;
+            let finalOutData = validOutData;
+            
+            if (!isRawData) {
+                // 应用波动、去重、排序和处理极值
+                finalInData = addVariationIfNeeded(validInData);
+                finalOutData = addVariationIfNeeded(validOutData);
+                
+                finalInData = deduplicatePoints(finalInData).sort((a, b) => a[0] - b[0]);
+                finalOutData = deduplicatePoints(finalOutData).sort((a, b) => a[0] - b[0]);
+                
+                // 检查极端值
+                const maxTrafficBps = 100000000000; // 100 Gbps上限
+                finalInData = finalInData.map(point => [point[0], Math.min(point[1], maxTrafficBps)]);
+                finalOutData = finalOutData.map(point => [point[0], Math.min(point[1], maxTrafficBps)]);
+            } else {
+                // 仅排序
+                finalInData = finalInData.sort((a, b) => a[0] - b[0]);
+                finalOutData = finalOutData.sort((a, b) => a[0] - b[0]);
+            }
             
             // 更新卡片数据
             card.inData = finalInData;
             card.outData = finalOutData;
             card.linkSpeed = speed || 1000000000; // 默认1Gbps
-            card.rawInData = sortedInData;  // 存储原始数据以备查看
-            card.rawOutData = sortedOutData;
+            card.rawInData = validInData.sort((a, b) => a[0] - b[0]);
+            card.rawOutData = validOutData.sort((a, b) => a[0] - b[0]);
             
-            // 找到最大流量值，用于计算利用率
-            let maxIn = 0;
-            let maxOut = 0;
+            // 找到最大流量值
+            const maxIn = Math.max(...finalInData.map(p => p[1]), 0);
+            const maxOut = Math.max(...finalOutData.map(p => p[1]), 0);
             
-            finalInData.forEach(point => {
-                if (Array.isArray(point) && point.length === 2 && point[1] !== null) {
-                    maxIn = Math.max(maxIn, point[1]);
-                }
-            });
-            
-            finalOutData.forEach(point => {
-                if (Array.isArray(point) && point.length === 2 && point[1] !== null) {
-                    maxOut = Math.max(maxOut, point[1]);
-                }
-            });
-            
-            // 更新流量显示
+            // 更新UI显示
             const $card = card.element;
             $card.find('.in-traffic').text(formatBits(maxIn));
             $card.find('.out-traffic').text(formatBits(maxOut));
-            
-            // 更新链路速度
-            if (card.linkSpeed) {
-                $card.find('.link-speed').text(formatSpeed(card.linkSpeed));
-            }
-            
-            // 更新卡片状态
+            $card.find('.link-speed').text(formatSpeed(card.linkSpeed));
             $card.find('.traffic-chart').removeClass('loading');
             
             // 绘制图表
@@ -1358,100 +1274,19 @@ $(document).ready(function() {
         }
     }
     
-    // 检查极端流量值
-    function checkExtremeValues(data) {
-        if (!data || data.length === 0) return data;
-        
-        const maxTrafficBps = 100000000000; // 100 Gbps作为上限
-        return data.map(point => {
-            if (point[1] > maxTrafficBps) {
-                console.warn('检测到异常大的流量值:', point);
-                return [point[0], maxTrafficBps]; // 限制最大值
-            }
-            return point;
-        });
-    }
-    
-    // 平滑数据点
-    function smoothDataPoints(data) {
-        if (!data || data.length < 5) return data;
-        
-        const result = [];
-        
-        // 保持第一个点不变
-        result.push(data[0]);
-        
-        // 对中间的点使用移动平均，增加窗口大小以获得更强的平滑效果
-        const windowSize = 5; // 增加窗口大小
-        for (let i = 1; i < data.length - 1; i++) {
-            let sum = 0;
-            let count = 0;
-            
-            // 收集窗口内的点
-            for (let j = Math.max(0, i - Math.floor(windowSize/2)); 
-                 j <= Math.min(data.length - 1, i + Math.floor(windowSize/2)); j++) {
-                if (Array.isArray(data[j]) && data[j].length === 2 && data[j][1] !== null) {
-                    sum += data[j][1];
-                    count++;
-                }
-            }
-            
-            const avgValue = count > 0 ? sum / count : data[i][1];
-            result.push([data[i][0], avgValue]);
-        }
-        
-        // 保持最后一个点不变
-        result.push(data[data.length - 1]);
-        
-        return result;
-    }
-    
-    // 处理计数器重置问题
-    function handleCounterResets(data) {
-        if (!data || data.length < 2) return data;
-        
-        const result = [];
-        result.push(data[0]); // 添加第一个点
-        
-        // 检测计数器重置的阈值
-        const threshold = 0.5; // 如果值下降50%以上，认为是计数器重置
-        
-        for (let i = 1; i < data.length; i++) {
-            const current = data[i];
-            const previous = data[i-1];
-            
-            if (current[1] < previous[1] * (1 - threshold)) {
-                // 可能是计数器重置，使用线性插值创建过渡点
-                // 在重置点前添加一个null点，使图表断开
-                result.push([current[0] - 1, null]); 
-            }
-            
-            result.push(current);
-        }
-        
-        return result;
-    }
-
-    // 绘制流量图表
+    // 绘制流量图表 - 精简版
     function drawTrafficChart(card) {
-        // 获取canvas元素
         const canvas = document.getElementById(card.canvasId);
-        if (!canvas) {
-            console.error('找不到canvas元素:', card.canvasId);
-            return;
-        }
+        if (!canvas) return;
         
         const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            console.error('无法获取canvas上下文');
-            return;
-        }
+        if (!ctx) return;
         
         // 清除画布
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // 如果没有数据，显示加载中...
-        if (!card.inData || !card.outData || card.inData.length === 0 || card.outData.length === 0) {
+        // 如果没有数据，显示提示信息
+        if (!card.inData?.length || !card.outData?.length) {
             ctx.font = '14px Arial';
             ctx.fillStyle = '#666';
             ctx.textAlign = 'center';
@@ -1460,45 +1295,31 @@ $(document).ready(function() {
         }
         
         // 设置图表边距
-        const margin = {
-            top: 20,
-            right: 50,
-            bottom: 40,
-            left: 60
-        };
-        
-        // 计算图表绘制区域
+        const margin = { top: 20, right: 50, bottom: 40, left: 60 };
         const chartWidth = canvas.width - margin.left - margin.right;
         const chartHeight = canvas.height - margin.top - margin.bottom;
         
-        // 处理数据以绘制图表
-        const inValues = card.inData.map(item => item[1]);
-        const outValues = card.outData.map(item => item[1]);
-        
-        // 找出最大值和最小值
-        let maxTimestamp = 0;
+        // 计算数据范围
         let minTimestamp = Number.MAX_SAFE_INTEGER;
+        let maxTimestamp = 0;
         let maxValue = 0;
         
-        // 检查数据格式并找出范围
-        card.inData.forEach(point => {
-            if (Array.isArray(point) && point.length === 2 && point[1] !== null) {
-                maxTimestamp = Math.max(maxTimestamp, point[0]);
-                minTimestamp = Math.min(minTimestamp, point[0]);
-                maxValue = Math.max(maxValue, point[1]);
-            }
-        });
+        // 提取时间和数值范围
+        const processDataRange = (data) => {
+            data.forEach(point => {
+                if (Array.isArray(point) && point.length === 2 && point[1] !== null) {
+                    minTimestamp = Math.min(minTimestamp, point[0]);
+                    maxTimestamp = Math.max(maxTimestamp, point[0]);
+                    maxValue = Math.max(maxValue, point[1]);
+                }
+            });
+        };
         
-        card.outData.forEach(point => {
-            if (Array.isArray(point) && point.length === 2 && point[1] !== null) {
-                maxTimestamp = Math.max(maxTimestamp, point[0]);
-                minTimestamp = Math.min(minTimestamp, point[0]);
-                maxValue = Math.max(maxValue, point[1]);
-            }
-        });
+        processDataRange(card.inData);
+        processDataRange(card.outData);
         
-        // 使用缩放信息，如果有的话
-        if (card.zoomState && card.zoomState.active) {
+        // 应用缩放状态
+        if (card.zoomState?.active) {
             minTimestamp = card.zoomState.minTime;
             maxTimestamp = card.zoomState.maxTime;
         }
@@ -1512,137 +1333,139 @@ $(document).ready(function() {
             return;
         }
         
-        // 对于零流量的情况，设置一个最小的Y轴范围
+        // 处理零流量情况
         if (maxValue === 0) {
-            maxValue = 1000; // 设置为1Kbps，确保图表可以显示
-            
-            // 添加零流量提示
+            maxValue = 1000; // 设置最小Y轴范围
             ctx.font = '12px Arial';
             ctx.fillStyle = '#888';
             ctx.textAlign = 'center';
             ctx.fillText('当前显示的是正常的零流量数据', canvas.width / 2, margin.top + 10);
         }
         
-        // 给最大值增加一点余量
-        maxValue = maxValue * 1.1;
+        // 给最大值增加10%余量
+        maxValue *= 1.1;
         
-        // 缩放因子
+        // 计算缩放比例
         const xScale = chartWidth / (maxTimestamp - minTimestamp);
         const yScale = chartHeight / maxValue;
         
-        // 背景填充
+        // 绘制背景和网格
         ctx.fillStyle = '#f9f9f9';
         ctx.fillRect(margin.left, margin.top, chartWidth, chartHeight);
         
-        // 绘制Y轴
+        // 绘制Y轴网格和标签
+        drawYAxis(ctx, margin, chartWidth, chartHeight, maxValue);
+        
+        // 绘制X轴网格和时间标签
+        drawXAxis(ctx, margin, chartWidth, chartHeight, minTimestamp, maxTimestamp, card.timespan);
+        
+        // 添加图例
+        drawLegend(ctx, margin);
+        
+        // 绘制水位图
+        drawWaterLevel(ctx, card.inData, '#00c0ef', margin, chartWidth, chartHeight, minTimestamp, maxTimestamp, xScale, yScale);
+        drawWaterLevel(ctx, card.outData, '#8957ff', margin, chartWidth, chartHeight, minTimestamp, maxTimestamp, xScale, yScale);
+        
+        // 绘制曲线
+        const inPositions = drawDataLine(ctx, card.inData, '#00c0ef', margin, chartWidth, chartHeight, minTimestamp, maxTimestamp, xScale, yScale);
+        const outPositions = drawDataLine(ctx, card.outData, '#8957ff', margin, chartWidth, chartHeight, minTimestamp, maxTimestamp, xScale, yScale);
+        
+        // 存储点位置用于交互
+        card.pointPositions = [...inPositions, ...outPositions];
+        
+        // 绘制选择区域（如果有）
+        if (card.zoomSelection?.active) {
+            drawSelectionArea(ctx, card.zoomSelection, margin, chartHeight);
+        }
+        
+        // 绘制边框
+        ctx.beginPath();
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 1;
+        ctx.rect(margin.left, margin.top, chartWidth, chartHeight);
+        ctx.stroke();
+    }
+    
+    // 绘制Y轴
+    function drawYAxis(ctx, margin, chartWidth, chartHeight, maxValue) {
         ctx.beginPath();
         ctx.strokeStyle = '#ddd';
         ctx.lineWidth = 1;
         
-        // Y轴刻度
         const yTicks = 5;
         for (let i = 0; i <= yTicks; i++) {
             const y = margin.top + chartHeight - (i * chartHeight / yTicks);
             const value = (i * maxValue / yTicks);
             
-            // 绘制水平网格线
+            // 水平网格线
             ctx.moveTo(margin.left, y);
             ctx.lineTo(margin.left + chartWidth, y);
             
-            // 添加刻度标签
+            // 左侧刻度标签
             ctx.fillStyle = '#666';
             ctx.font = '10px Arial';
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
             ctx.fillText(formatBits(value), margin.left - 5, y);
             
-            // 在右侧也添加刻度标签
+            // 右侧刻度标签
             ctx.textAlign = 'left';
             ctx.fillText(formatBits(value), margin.left + chartWidth + 5, y);
         }
         ctx.stroke();
-        
-        // 绘制X轴
+    }
+    
+    // 绘制X轴
+    function drawXAxis(ctx, margin, chartWidth, chartHeight, minTimestamp, maxTimestamp, timespan) {
         ctx.beginPath();
         ctx.strokeStyle = '#ddd';
         
-        // X轴刻度
-        let xTicks = 6;
-        
-        // 计算合适的刻度点数量，根据数据点密度和时间跨度动态调整
-        if (card.timespan === '1h') {
-            xTicks = 12; // 每5分钟一个刻度
-        } else if (card.timespan === '1d') {
-            xTicks = 12; // 每2小时一个刻度
-        } else if (card.timespan === '7d') {
-            xTicks = 14; // 每12小时一个刻度
-        } else if (card.timespan === '30d') {
-            xTicks = 15; // 每2天一个刻度
-        }
-        
-        // 如果数据点较少，则基于实际数据点绘制刻度
-        if (card.inData.length > 0 && card.inData.length < xTicks) {
-            xTicks = card.inData.length;
-        }
-        
-        // 使用更加精确的时间刻度
-        const timeFormat = new Intl.DateTimeFormat('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        // 根据时间跨度确定刻度数量
+        let xTicks = timespan === '1h' ? 12 : 
+                     timespan === '1d' ? 12 : 
+                     timespan === '7d' ? 14 : 15;
         
         for (let i = 0; i <= xTicks; i++) {
             const x = margin.left + (i * chartWidth / xTicks);
             const timestamp = minTimestamp + (i * (maxTimestamp - minTimestamp) / xTicks);
             const date = new Date(timestamp);
             
-            // 绘制垂直网格线
+            // 垂直网格线
             ctx.moveTo(x, margin.top);
             ctx.lineTo(x, margin.top + chartHeight);
             
-            // 添加刻度标签
+            // 格式化时间标签
+            let timeLabel;
+            if (timespan === '1h') {
+                // 小时:分钟
+                timeLabel = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+            } else if (timespan === '1d') {
+                // 小时:分钟
+                timeLabel = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+            } else if (timespan === '7d') {
+                // 月/日 小时
+                timeLabel = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:00`;
+            } else {
+                // 月/日
+                timeLabel = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+            }
+            
+            // 绘制标签
             ctx.fillStyle = '#666';
             ctx.font = '10px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            
-            // 格式化时间标签 - 使用更灵活的格式化策略
-            let timeLabel;
-            if (card.timespan === '1h') {
-                // 小时:分钟 格式
-                const hours = date.getHours().toString().padStart(2, '0');
-                const minutes = date.getMinutes().toString().padStart(2, '0');
-                timeLabel = `${hours}:${minutes}`;
-            } else if (card.timespan === '1d') {
-                // 使用24小时制，显示小时和分钟
-                const hours = date.getHours().toString().padStart(2, '0');
-                const minutes = date.getMinutes().toString().padStart(2, '0');
-                timeLabel = `${hours}:${minutes}`;
-            } else if (card.timespan === '7d') {
-                // 显示月日和小时
-                const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                const day = date.getDate().toString().padStart(2, '0');
-                const hours = date.getHours().toString().padStart(2, '0');
-                timeLabel = `${month}/${day} ${hours}:00`;
-            } else {
-                // 月/日 格式
-                const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                const day = date.getDate().toString().padStart(2, '0');
-                timeLabel = `${month}/${day}`;
-            }
-            
             ctx.fillText(timeLabel, x, margin.top + chartHeight + 5);
         }
         ctx.stroke();
-        
-        // 添加图例
+    }
+    
+    // 绘制图例
+    function drawLegend(ctx, margin) {
         const legendX = margin.left + 10;
         const legendY = margin.top + 15;
         
-        // 入流量图例
+        // 入流量
         ctx.fillStyle = '#00c0ef';
         ctx.fillRect(legendX, legendY, 15, 10);
         ctx.fillStyle = '#333';
@@ -1651,277 +1474,191 @@ $(document).ready(function() {
         ctx.textBaseline = 'middle';
         ctx.fillText('入流量', legendX + 20, legendY + 5);
         
-        // 出流量图例
+        // 出流量
         ctx.fillStyle = '#8957ff';
         ctx.fillRect(legendX + 80, legendY, 15, 10);
         ctx.fillStyle = '#333';
         ctx.fillText('出流量', legendX + 100, legendY + 5);
-        
-        // 绘制平滑曲线函数
-        function drawSmoothLine(data, color, fillColor) {
-        // 存储点位置，用于鼠标交互
-            const positions = [];
-            
-            // 找出有效的数据点
-            const validPoints = data.filter(point => 
-                Array.isArray(point) && point.length === 2 && 
-                point[1] !== null && 
-                point[0] >= minTimestamp && point[0] <= maxTimestamp
-            );
-            
-            if (validPoints.length === 0) return positions;
-            
-            // 寻找分段点（null值或异常值表示断点）
-            const segments = [];
-            let currentSegment = [];
-            
-            for (let i = 0; i < validPoints.length; i++) {
-                const point = validPoints[i];
-                const prevPoint = i > 0 ? validPoints[i-1] : null;
-                
-                // 检查是否需要开始新段
-                if (prevPoint && (
-                    point[1] === null || 
-                    prevPoint[1] === null ||
-                    // 值突然下降超过50%，可能是计数器重置
-                    (point[1] < prevPoint[1] * 0.5) ||
-                    // 值突然增加10倍以上，可能是异常
-                    (point[1] > prevPoint[1] * 10)
-                )) {
-                    if (currentSegment.length > 0) {
-                        segments.push(currentSegment);
-                        currentSegment = [];
-                    }
-                }
-                
-                if (point[1] !== null) {
-                    currentSegment.push(point);
-                }
-            }
-            
-            if (currentSegment.length > 0) {
-                segments.push(currentSegment);
-            }
-            
-            // 为每个段绘制平滑曲线
-            ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-            ctx.lineJoin = 'round';
-            
-            // 检查是否应该使用实际数据点而不是平滑曲线
-            const useExactPoints = validPoints.length > 100;  // 当数据点较多时，使用精确连接，而不是平滑曲线
-            
-            // 绘制每个段的曲线
-            segments.forEach(segment => {
-                if (segment.length < 2) return; // 至少需要两个点
-                
-                ctx.beginPath();
-                
-                // 绘制线条
-                if (useExactPoints) {
-                    // 使用精确连接点，不进行曲线平滑
-                    for (let i = 0; i < segment.length; i++) {
-                        const point = segment[i];
-                        const x = margin.left + (point[0] - minTimestamp) * xScale;
-                    const y = margin.top + chartHeight - (point[1] * yScale);
-                    
-                        // 存储点位置，用于鼠标交互
-                        positions.push({
-                            x: x,
-                            y: y,
-                            timestamp: point[0],
-                            value: point[1],
-                            type: color === '#00c0ef' ? 'in' : 'out'
-                        });
-                        
-                        if (i === 0) {
-                        ctx.moveTo(x, y);
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
-                    }
-                } else {
-                    // 使用贝塞尔曲线绘制平滑线条 - 适合点较少的情况
-                    for (let i = 0; i < segment.length; i++) {
-                        const point = segment[i];
-                        const x = margin.left + (point[0] - minTimestamp) * xScale;
-                        const y = margin.top + chartHeight - (point[1] * yScale);
-                        
-                        // 存储点位置
-                        positions.push({
-                        x: x,
-                        y: y,
-                            timestamp: point[0],
-                        value: point[1],
-                            type: color === '#00c0ef' ? 'in' : 'out'
-                        });
-                        
-                        if (i === 0) {
-                            // 第一个点，移动到起点
-                            ctx.moveTo(x, y);
-                        } else if (i === segment.length - 1) {
-                            // 最后一个点，直接连线到终点
-                            ctx.lineTo(x, y);
-                        } else {
-                            // 中间点，使用三次贝塞尔曲线
-                            const prevPoint = segment[i-1];
-                            const nextPoint = segment[i+1];
-                            
-                            const prevX = margin.left + (prevPoint[0] - minTimestamp) * xScale;
-                            const prevY = margin.top + chartHeight - (prevPoint[1] * yScale);
-                            const nextX = margin.left + (nextPoint[0] - minTimestamp) * xScale;
-                            const nextY = margin.top + chartHeight - (nextPoint[1] * yScale);
-                            
-                            // 控制点，使曲线平滑度降低，更接近实际数据
-                            const cp1x = prevX + (x - prevX) * 0.3;  // 减小平滑系数
-                            const cp1y = prevY + (y - prevY) * 0.2;  // 更接近实际数据点
-                            const cp2x = x - (x - prevX) * 0.3;
-                            const cp2y = y - (y - prevY) * 0.2;
-                            
-                            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y);
-                        }
-                    }
-                }
-                
-                // 描边
-        ctx.stroke();
-        
-                // 添加填充
-                if (fillColor && segment.length > 1) {
-                    ctx.lineTo(
-                        margin.left + (segment[segment.length-1][0] - minTimestamp) * xScale, 
-                        margin.top + chartHeight
-                    );
-                    ctx.lineTo(
-                        margin.left + (segment[0][0] - minTimestamp) * xScale, 
-                        margin.top + chartHeight
-                    );
-            ctx.closePath();
-                    ctx.fillStyle = fillColor;
-                    ctx.globalAlpha = 0.1;
-            ctx.fill();
-                    ctx.globalAlpha = 1.0;
-                }
-            });
-            
-            return positions;
-        }
-        
-        // 绘制入流量和出流量曲线
-        const inPositions = drawSmoothLine(card.inData, '#00c0ef', 'rgba(0, 192, 239, 0.1)');
-        const outPositions = drawSmoothLine(card.outData, '#8957ff', 'rgba(137, 87, 255, 0.1)');
-        
-        // 合并点位置数据用于鼠标交互
-        card.pointPositions = [...inPositions, ...outPositions];
-        
-        // 边框
-        ctx.beginPath();
-        ctx.strokeStyle = '#ddd';
-        ctx.lineWidth = 1;
-        ctx.rect(margin.left, margin.top, chartWidth, chartHeight);
-        ctx.stroke();
     }
     
-    // 高亮显示数据点
-    function highlightDataPoint(card, canvas, index) {
-        // 确保原始数据存在
-        if (!card.rawInData || !card.rawOutData) return;
+    // 绘制水位图
+    function drawWaterLevel(ctx, data, color, margin, chartWidth, chartHeight, minTimestamp, maxTimestamp, xScale, yScale) {
+        if (!data || data.length === 0) return;
         
-        const inValue = card.rawInData[index][1];
-        const outValue = card.rawOutData[index][1];
+        // 筛选有效点
+        const validPoints = data.filter(point => 
+            Array.isArray(point) && point.length === 2 && 
+            point[1] !== null && 
+            point[0] >= minTimestamp && point[0] <= maxTimestamp
+        ).sort((a, b) => a[0] - b[0]);
         
-        // 更新卡片上的信息
-        const $card = card.element;
-        $card.find('.in-traffic').text(formatBits(inValue));
-        $card.find('.out-traffic').text(formatBits(outValue));
+        if (validPoints.length === 0) return;
         
-        // 重新绘制图表并高亮当前点
-        drawTrafficChart(card);
+        // 数据点超过500时进行采样
+        let pointsToUse = validPoints;
+        const maxPoints = 500;
         
-        // 获取canvas上下文
-        const ctx = canvas.getContext('2d');
-        
-        // 设置图表边距
-        const margin = {
-            top: 20,
-            right: 50,
-            bottom: 40,
-            left: 60
-        };
-        
-        // 计算图表绘制区域
-        const chartWidth = canvas.width - margin.left - margin.right;
-        const chartHeight = canvas.height - margin.top - margin.bottom;
-        
-        // 找出最大值和最小值
-        let maxTimestamp = 0;
-        let minTimestamp = Number.MAX_SAFE_INTEGER;
-        let maxValue = 0;
-        
-        // 检查数据格式并找出范围
-        card.inData.forEach(point => {
-            if (Array.isArray(point) && point.length === 2 && point[1] !== null) {
-                maxTimestamp = Math.max(maxTimestamp, point[0]);
-                minTimestamp = Math.min(minTimestamp, point[0]);
-                maxValue = Math.max(maxValue, point[1]);
+        if (validPoints.length > maxPoints) {
+            const interval = Math.ceil(validPoints.length / maxPoints);
+            pointsToUse = [];
+            
+            for (let i = 0; i < validPoints.length; i += interval) {
+                pointsToUse.push(validPoints[i]);
             }
-        });
-        
-        card.outData.forEach(point => {
-            if (Array.isArray(point) && point.length === 2 && point[1] !== null) {
-                maxTimestamp = Math.max(maxTimestamp, point[0]);
-                minTimestamp = Math.min(minTimestamp, point[0]);
-                maxValue = Math.max(maxValue, point[1]);
+            
+            // 确保包含最后一个点
+            if (pointsToUse[pointsToUse.length - 1] !== validPoints[validPoints.length - 1]) {
+                pointsToUse.push(validPoints[validPoints.length - 1]);
             }
-        });
-        
-        // 使用缩放信息，如果有的话
-        if (card.zoomState && card.zoomState.active) {
-            minTimestamp = card.zoomState.minTime;
-            maxTimestamp = card.zoomState.maxTime;
         }
         
-        // 给最大值增加一点余量
-        maxValue = maxValue * 1.1;
+        // 创建渐变
+        const gradient = ctx.createLinearGradient(
+            margin.left, margin.top + chartHeight, margin.left, margin.top
+        );
         
-        // 缩放因子
-        const xScale = chartWidth / (maxTimestamp - minTimestamp);
-        const yScale = chartHeight / maxValue;
+        if (color === '#00c0ef') {
+            gradient.addColorStop(0, 'rgba(0, 192, 239, 0.04)');
+            gradient.addColorStop(0.5, 'rgba(0, 192, 239, 0.1)');
+            gradient.addColorStop(1, 'rgba(0, 192, 239, 0.2)');
+        } else {
+            gradient.addColorStop(0, 'rgba(137, 87, 255, 0.04)');
+            gradient.addColorStop(0.5, 'rgba(137, 87, 255, 0.1)');
+            gradient.addColorStop(1, 'rgba(137, 87, 255, 0.2)');
+        }
         
-        // 计算当前点的坐标
-        const point = card.rawInData[index];
-        const inX = margin.left + (point[0] - minTimestamp) * xScale;
-        const inY = margin.top + chartHeight - (point[1] * yScale);
-        
-        const outPoint = card.rawOutData[index];
-        const outX = margin.left + (outPoint[0] - minTimestamp) * xScale;
-        const outY = margin.top + chartHeight - (outPoint[1] * yScale);
-        
-        // 绘制高亮点
+        // 绘制水位图路径
         ctx.beginPath();
-        ctx.arc(inX, inY, 5, 0, Math.PI * 2);
-        ctx.fillStyle = '#00c0ef';
+        
+        // 起点（底部）
+        const firstPoint = pointsToUse[0];
+        const firstX = margin.left + (firstPoint[0] - minTimestamp) * xScale;
+        ctx.moveTo(firstX, margin.top + chartHeight);
+        
+        // 绘制所有点
+        pointsToUse.forEach(point => {
+            const x = margin.left + (point[0] - minTimestamp) * xScale;
+            const y = margin.top + chartHeight - (point[1] * yScale);
+            ctx.lineTo(x, y);
+        });
+        
+        // 闭合路径（回到底部）
+        const lastPoint = pointsToUse[pointsToUse.length - 1];
+        const lastX = margin.left + (lastPoint[0] - minTimestamp) * xScale;
+        ctx.lineTo(lastX, margin.top + chartHeight);
+        ctx.closePath();
+        
+        // 填充
+        ctx.fillStyle = gradient;
         ctx.fill();
-        ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
+    }
+    
+    // 绘制数据线
+    function drawDataLine(ctx, data, color, margin, chartWidth, chartHeight, minTimestamp, maxTimestamp, xScale, yScale) {
+        const positions = [];
+        
+        // 过滤有效点
+        const validPoints = data.filter(point => 
+            Array.isArray(point) && point.length === 2 && 
+            point[1] !== null && 
+            point[0] >= minTimestamp && point[0] <= maxTimestamp
+        );
+        
+        if (validPoints.length === 0) return positions;
+        
+        // 设置线条样式
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        
+        // 决定是否使用精确连接点（点多时）或贝塞尔曲线平滑（点少时）
+        const useExactPoints = validPoints.length > 100;
+        
+        // 开始绘制
+        ctx.beginPath();
+        
+        if (useExactPoints) {
+            // 精确连接所有点
+            validPoints.forEach((point, i) => {
+                const x = margin.left + (point[0] - minTimestamp) * xScale;
+                const y = margin.top + chartHeight - (point[1] * yScale);
+                
+                // 存储点位置用于交互
+                positions.push({
+                    x: x,
+                    y: y,
+                    timestamp: point[0],
+                    value: point[1],
+                    type: color === '#00c0ef' ? 'in' : 'out'
+                });
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+        } else {
+            // 贝塞尔曲线平滑连接
+            validPoints.forEach((point, i) => {
+                const x = margin.left + (point[0] - minTimestamp) * xScale;
+                const y = margin.top + chartHeight - (point[1] * yScale);
+                
+                // 存储点位置
+                positions.push({
+                    x: x,
+                    y: y,
+                    timestamp: point[0],
+                    value: point[1],
+                    type: color === '#00c0ef' ? 'in' : 'out'
+                });
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else if (i === validPoints.length - 1) {
+                    ctx.lineTo(x, y);
+                } else {
+                    // 计算控制点实现平滑曲线
+                    const prevPoint = validPoints[i-1];
+                    const prevX = margin.left + (prevPoint[0] - minTimestamp) * xScale;
+                    const prevY = margin.top + chartHeight - (prevPoint[1] * yScale);
+                    
+                    // 使用贝塞尔曲线控制点，降低平滑度以更接近实际数据
+                    const cp1x = prevX + (x - prevX) * 0.3;
+                    const cp1y = prevY + (y - prevY) * 0.2;
+                    const cp2x = x - (x - prevX) * 0.3;
+                    const cp2y = y - (y - prevY) * 0.2;
+                    
+                    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y);
+                }
+            });
+        }
+        
+        // 描边
         ctx.stroke();
         
-        ctx.beginPath();
-        ctx.arc(outX, outY, 5, 0, Math.PI * 2);
-        ctx.fillStyle = '#8957ff';
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
+        return positions;
+    }
+    
+    // 绘制选择区域
+    function drawSelectionArea(ctx, zoomSelection, margin, chartHeight) {
+        if (!zoomSelection.active) return;
+        
+        const startX = zoomSelection.startX;
+        const currentX = zoomSelection.currentX;
+        
+        // 计算左右边界
+        const leftX = Math.min(startX, currentX);
+        const rightX = Math.max(startX, currentX);
+        
+        // 绘制半透明选择区域
+        ctx.fillStyle = 'rgba(0, 123, 255, 0.2)';
+        ctx.fillRect(leftX, margin.top, rightX - leftX, chartHeight);
+        
+        // 绘制边框
+        ctx.strokeStyle = 'rgba(0, 123, 255, 0.5)';
         ctx.lineWidth = 1;
-        ctx.stroke();
-        
-        // 绘制垂直参考线
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-        ctx.setLineDash([5, 5]);
-        ctx.moveTo(inX, margin.top);
-        ctx.lineTo(inX, margin.top + chartHeight);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.strokeRect(leftX, margin.top, rightX - leftX, chartHeight);
     }
     
     // 添加CSS样式
