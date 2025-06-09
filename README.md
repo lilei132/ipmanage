@@ -2,7 +2,7 @@
 Website: https://phpipam.net/
 
 ## Description
-phpIPAM is an open-source web IP address management application. Its goal is to provide light and simple IP address management application.
+phpIPAM is 2025 6.9 an open-source web IP address management application. Its goal is to provide light and simple IP address management application.
 It is ajax-based using jQuery libraries, it uses php scripts and javascript and some HTML5/CSS3 features, so some modern browser is preferred
 to be able to display javascript quickly and correctly.
 
