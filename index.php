@@ -111,7 +111,7 @@ else {
 		<style type="text/css">
 		.content {
 			margin-top: 0px;
-			padding-top: 10px;
+			padding-top: 0px;
 		}
 		.mainContainer {
 			margin-top: 0px;

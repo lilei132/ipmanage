@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>缓存 API 测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        .success {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>缓存 API 修复测试</h1>
+        
+        <div class="test-section" id="cacheSupport">
+            <h3>1. 缓存 API 支持检测</h3>
+            <p id="supportResult">检测中...</p>
+        </div>
+
+        <div class="test-section">
+            <h3>2. 基础缓存操作测试</h3>
+            <button onclick="testBasicCache()">测试基础缓存操作</button>
+            <button onclick="testSafeCache()">测试安全缓存操作</button>
+            <p id="cacheResult"></p>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 错误处理测试</h3>
+            <button onclick="triggerCacheError()">触发缓存错误</button>
+            <button onclick="triggerGeneralError()">触发一般错误</button>
+            <p id="errorResult"></p>
+        </div>
+
+        <div class="test-section">
+            <h3>4. 实时日志</h3>
+            <button onclick="clearLog()">清除日志</button>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <!-- 加载我们的修复脚本 -->
+    <script src="js/cache-polyfill.js"></script>
+    <script src="js/error-handler.js"></script>
+
+    <script>
+        // 日志函数
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // 检测缓存 API 支持
+        function checkCacheSupport() {
+            const supportDiv = document.getElementById('cacheSupport');
+            const resultP = document.getElementById('supportResult');
+            
+            if (typeof caches !== 'undefined') {
+                resultP.textContent = '✅ 缓存 API 可用 (原生或 polyfill)';
+                supportDiv.className = 'test-section success';
+                log('缓存 API 检测：可用', 'success');
+            } else {
+                resultP.textContent = '❌ 缓存 API 不可用';
+                supportDiv.className = 'test-section error';
+                log('缓存 API 检测：不可用', 'error');
+            }
+        }
+
+        // 测试基础缓存操作
+        async function testBasicCache() {
+            const resultP = document.getElementById('cacheResult');
+            
+            try {
+                log('开始测试基础缓存操作...');
+                
+                // 打开缓存
+                const cache = await caches.open('test-cache');
+                log('缓存打开成功');
+                
+                // 创建测试数据
+                const testUrl = 'https://example.com/test';
+                const testResponse = new Response('测试数据', {
+                    status: 200,
+                    statusText: 'OK'
+                });
+                
+                // 存储到缓存
+                await cache.put(testUrl, testResponse);
+                log('数据存储到缓存成功');
+                
+                // 从缓存读取
+                const cachedResponse = await cache.match(testUrl);
+                if (cachedResponse) {
+                    const cachedData = await cachedResponse.text();
+                    log(`从缓存读取数据成功: ${cachedData}`);
+                    resultP.textContent = '✅ 基础缓存操作测试通过';
+                    resultP.style.color = 'green';
+                } else {
+                    throw new Error('无法从缓存读取数据');
+                }
+                
+            } catch (error) {
+                log(`基础缓存测试失败: ${error.message}`, 'error');
+                resultP.textContent = `❌ 基础缓存操作测试失败: ${error.message}`;
+                resultP.style.color = 'red';
+            }
+        }
+
+        // 测试安全缓存操作
+        function testSafeCache() {
+            const resultP = document.getElementById('cacheResult');
+            
+            try {
+                log('开始测试安全缓存操作...');
+                
+                if (typeof window.safeCache === 'undefined') {
+                    throw new Error('safeCache 不可用');
+                }
+                
+                // 存储数据
+                const testKey = 'test-key';
+                const testValue = { data: '测试数据', timestamp: Date.now() };
+                const stored = window.safeCache.set(testKey, testValue, 60000); // 1分钟TTL
+                
+                if (!stored) {
+                    throw new Error('数据存储失败');
+                }
+                log('数据存储到安全缓存成功');
+                
+                // 读取数据
+                const retrieved = window.safeCache.get(testKey, 60000);
+                if (retrieved && retrieved.data === testValue.data) {
+                    log(`从安全缓存读取数据成功: ${JSON.stringify(retrieved)}`);
+                    resultP.textContent = '✅ 安全缓存操作测试通过';
+                    resultP.style.color = 'green';
+                } else {
+                    throw new Error('数据读取失败或不匹配');
+                }
+                
+                // 清理
+                window.safeCache.remove(testKey);
+                log('测试数据清理完成');
+                
+            } catch (error) {
+                log(`安全缓存测试失败: ${error.message}`, 'error');
+                resultP.textContent = `❌ 安全缓存操作测试失败: ${error.message}`;
+                resultP.style.color = 'red';
+            }
+        }
+
+        // 触发缓存错误
+        function triggerCacheError() {
+            const resultP = document.getElementById('errorResult');
+            
+            try {
+                log('尝试触发缓存错误...');
+                
+                // 临时删除 caches 来模拟错误
+                const originalCaches = window.caches;
+                delete window.caches;
+                
+                // 尝试访问 caches
+                if (typeof caches === 'undefined') {
+                    throw new Error('caches is not defined');
+                }
+                
+                // 恢复
+                window.caches = originalCaches;
+                
+            } catch (error) {
+                log(`成功捕获缓存错误: ${error.message}`, 'error');
+                resultP.textContent = '✅ 缓存错误处理测试通过';
+                resultP.style.color = 'green';
+            }
+        }
+
+        // 触发一般错误
+        function triggerGeneralError() {
+            const resultP = document.getElementById('errorResult');
+            
+            try {
+                log('尝试触发一般 JavaScript 错误...');
+                
+                // 故意创建一个错误
+                const obj = null;
+                obj.someProperty.someMethod();
+                
+            } catch (error) {
+                log(`成功捕获一般错误: ${error.message}`, 'error');
+                resultP.textContent = '✅ 一般错误处理测试通过';
+                resultP.style.color = 'green';
+            }
+        }
+
+        // 清除日志
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // 页面加载完成后自动检测
+        document.addEventListener('DOMContentLoaded', function() {
+            checkCacheSupport();
+            log('测试页面加载完成');
+        });
+
+        // 监听全局错误事件
+        window.addEventListener('error', function(event) {
+            log(`全局错误监听器捕获: ${event.message}`, 'error');
+        });
+
+        window.addEventListener('unhandledrejection', function(event) {
+            log(`未处理的 Promise 拒绝: ${event.reason}`, 'error');
+        });
+    </script>
+</body>
+</html> 

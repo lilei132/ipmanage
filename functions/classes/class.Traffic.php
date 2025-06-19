@@ -693,7 +693,7 @@ class Traffic extends Common_functions {
     }
     
     /**
-     * 获取设备接口列表
+     * 获取设备接口列表（极速优化版本）
      *
      * @access public
      * @param int $device_id
@@ -701,89 +701,88 @@ class Traffic extends Common_functions {
      */
     public function get_device_interfaces($device_id) {
         try {
-            // 获取设备信息
-            $device = $this->fetch_object("devices", "id", $device_id);
-            if ($device === false) {
-                error_log("Device not found: " . $device_id);
-                return false;
-            }
-            error_log("Device found: " . print_r($device, true));
-
-            // 从最近的流量历史记录中获取接口列表
+            $start_time = microtime(true);
+            
+            // 极简查询：直接获取去重的接口信息，限制记录数
             $query = "SELECT DISTINCT 
                         if_index,
                         if_name,
                         if_description,
-                        speed,
-                        MAX(timestamp) as last_seen
+                        speed
                      FROM 
                         port_traffic_history
                      WHERE 
                         device_id = ?
-                     GROUP BY 
-                        if_index, if_name, if_description, speed
-                     ORDER BY 
-                        if_index";
+                        AND if_name IS NOT NULL 
+                        AND if_name != ''
+                        AND timestamp > DATE_SUB(NOW(), INTERVAL 7 DAY)
+                     ORDER BY CAST(if_index AS UNSIGNED)
+                     LIMIT 50";
 
             try {
                 $interfaces = $this->Database->getObjectsQuery("port_traffic_history", $query, array($device_id));
+                $end_time = microtime(true);
                 
-                // 如果没有数据，尝试直接从设备获取接口列表
+                $query_time = round(($end_time - $start_time) * 1000, 2);
+                error_log("Fast interface query completed in {$query_time}ms for device: " . $device_id);
+                
                 if (empty($interfaces)) {
-                    error_log("No interfaces found in history for device: " . $device_id . ", trying SNMP...");
-                    
-                    // 确保设备支持SNMP
-                    if ($device->snmp_version == 0) {
-                        error_log("Device does not support SNMP, can't get interfaces");
-                        return array();
-                    }
-                    
-                    // 配置SNMP设备
-                    try {
-                        $this->SNMP->set_snmp_device($device);
-                        
-                        // 尝试通过SNMP获取接口列表
-                        $snmp_interfaces = $this->SNMP->get_query('get_interfaces');
-                        
-                        if ($snmp_interfaces !== false && !empty($snmp_interfaces)) {
-                            error_log("Found " . count($snmp_interfaces) . " interfaces via SNMP");
-                            
-                            // 转换成与历史记录相同的格式
-                            $formatted_interfaces = array();
-                            foreach ($snmp_interfaces as $if_index => $interface) {
-                                $obj = new StdClass();
-                                $obj->if_index = $if_index;
-                                $obj->if_name = isset($interface['name']) ? $interface['name'] : '';
-                                $obj->if_description = isset($interface['description']) ? $interface['description'] : '';
-                                $obj->speed = isset($interface['speed']) ? $interface['speed'] : 0;
-                                $obj->last_seen = time();
-                                $formatted_interfaces[] = $obj;
-                            }
-                            
-                            error_log("Formatted SNMP interfaces: " . print_r($formatted_interfaces, true));
-                            return $formatted_interfaces;
-                        } else {
-                            error_log("No interfaces found via SNMP for device: " . $device_id);
-                            return array();
-                        }
-                    } catch (Exception $e) {
-                        error_log("SNMP error getting interfaces: " . $e->getMessage());
-                        // 返回空数组而不是失败
-                        return array();
-                    }
+                    error_log("No recent interfaces found, trying broader search for device: " . $device_id);
+                    return $this->get_device_interfaces_fallback($device_id);
                 }
 
-                error_log("Interfaces found in history: " . print_r($interfaces, true));
+                error_log("Found " . count($interfaces) . " interfaces for device: " . $device_id);
                 return $interfaces;
             }
             catch (Exception $e) {
                 error_log("Database error getting interfaces: " . $e->getMessage());
-                throw $e;
+                return $this->get_device_interfaces_fallback($device_id);
             }
         }
         catch (Exception $e) {
             error_log("Error in get_device_interfaces: " . $e->getMessage());
             throw $e;
+        }
+    }
+    
+    /**
+     * 回退方法：使用简化的查询（更宽时间范围）
+     *
+     * @access private
+     * @param int $device_id
+     * @return array
+     */
+    private function get_device_interfaces_fallback($device_id) {
+        try {
+            $start_time = microtime(true);
+            
+            // 扩大时间范围到30天，但仍限制结果数量
+            $query = "SELECT DISTINCT 
+                        if_index,
+                        if_name,
+                        if_description,
+                        speed
+                     FROM 
+                        port_traffic_history
+                     WHERE 
+                        device_id = ?
+                        AND if_name IS NOT NULL 
+                        AND if_name != ''
+                        AND timestamp > DATE_SUB(NOW(), INTERVAL 30 DAY)
+                     ORDER BY CAST(if_index AS UNSIGNED)
+                     LIMIT 50";
+
+            $interfaces = $this->Database->getObjectsQuery("port_traffic_history", $query, array($device_id));
+            $end_time = microtime(true);
+            
+            $query_time = round(($end_time - $start_time) * 1000, 2);
+            error_log("Fallback interface query completed in {$query_time}ms for device: " . $device_id);
+            
+            return $interfaces ?: array();
+        }
+        catch (Exception $e) {
+            error_log("Fallback query also failed: " . $e->getMessage());
+            return array();
         }
     }
     

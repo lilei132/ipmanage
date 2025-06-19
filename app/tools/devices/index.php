@@ -103,14 +103,3 @@ elseif(isset($GET->subnetId)) {
 } else {
 	include('all-devices.php');
 }
-
-// 检查页面
-if(!isset($_GET['sPage'])) { $_GET['sPage'] = ""; }
-
-// 根据不同页面选择要载入的页面
-if(!isset($_GET['subnetId'])) 		{ include("all-devices.php"); }
-// 具体设备详情页面
-elseif($_GET['sPage'] == "")            { include("device-details/device-details.php"); }
-// 子页面
-elseif($_GET['sPage'] == "device-details-traffic") { include("device-details/device-traffic.php"); }
-else                                                            { include("device-details/device-details-$_GET[sPage].php"); }

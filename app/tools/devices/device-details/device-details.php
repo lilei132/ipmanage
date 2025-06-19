@@ -282,7 +282,7 @@ if($GET->subnetId!=0 && sizeof($device)>0) {
 	# rack
 	if ($User->settings->enableRACK=="1" && $User->get_module_permissions ("racks")>=User::ACCESS_R) {
 
-    	print "<td vertical-align:top !important;' class='text-right'>";
+    	print "<td style='vertical-align:top !important;' class='text-right'>";
         // validate rack
         $rack = $Tools->fetch_object ("racks", "id", $device['rack']);
         if ($rack!==false) {

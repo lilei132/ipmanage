@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+mysql -u phpipam -pphpipamadmin -e "USE phpipam  
+所有的数据库信息，账号密码，请依据上面

@@ -1,0 +1,814 @@
+<?php
+/**
+ * 流量监控看板系统 - 极简高效版本
+ * 解决22秒加载问题 - 从数据库直接获取接口信息
+ */
+
+require_once dirname(__FILE__) . "/../../../functions/functions.php";
+
+$User->check_user_session();
+if ($User->get_module_permissions("devices") < User::ACCESS_R) {
+    $Result->show("danger", _("无权访问此页面"), true);
+    die();
+}
+
+// 处理AJAX请求
+if (isset($_GET['action'])) {
+    header('Content-Type: application/json');
+    header('Cache-Control: max-age=60'); // 缓存1分钟
+    
+    switch ($_GET['action']) {
+        case 'get_devices':
+            // 优化：只获取必要字段，加快查询速度
+            $query = "SELECT id, hostname, description, ip_addr FROM devices WHERE snmp_version != 0 ORDER BY hostname";
+            $devices = $Database->getObjectsQuery($query);
+            
+            $device_list = [];
+            if ($devices) {
+                foreach ($devices as $device) {
+                    $device_list[] = [
+                        'id' => $device->id,
+                        'hostname' => $device->hostname,
+                        'description' => $device->description ?? '',
+                        'ip_addr' => $device->ip_addr ?? ''
+                    ];
+                }
+            }
+            
+            echo json_encode(['success' => true, 'devices' => $device_list]);
+            exit;
+            
+        case 'get_interfaces':
+            $deviceId = $_GET['deviceId'] ?? null;
+            
+            if (!$deviceId) {
+                echo json_encode(['success' => false, 'error' => '缺少设备ID']);
+                exit;
+            }
+            
+            try {
+                // 优化：添加索引提示和条件优化
+                $query = "SELECT if_index, if_name, if_description, speed 
+                         FROM devices_interfaces 
+                         WHERE device_id = ? 
+                         AND (if_oper_status = 1 OR if_oper_status IS NULL)
+                         AND if_index IS NOT NULL
+                         ORDER BY CAST(if_index AS UNSIGNED)
+                         LIMIT 100";  // 限制结果数量
+                
+                $interfaces = $Database->getObjectsQuery($query, [$deviceId]);
+                
+                $formatted = [];
+                if ($interfaces) {
+                    foreach ($interfaces as $interface) {
+                        $formatted[] = [
+                            'if_index' => $interface->if_index,
+                            'if_name' => $interface->if_name ?? 'Interface-' . $interface->if_index,
+                            'if_description' => $interface->if_description ?? '',
+                            'speed' => intval($interface->speed ?? 1000000000)
+                        ];
+                    }
+                }
+                
+                echo json_encode(['success' => true, 'interfaces' => $formatted]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+            
+        case 'get_traffic_data':
+            $deviceId = $_GET['deviceId'] ?? null;
+            $interfaceId = $_GET['interfaceId'] ?? null;
+            $timespan = $_GET['timespan'] ?? '7d';
+            
+            if (!$deviceId || !$interfaceId) {
+                echo json_encode(['success' => false, 'error' => '缺少参数']);
+                exit;
+            }
+            
+            try {
+                // 优化：使用更精确的时间条件和限制数据点
+                $intervals = [
+                    '1h' => ['INTERVAL 1 HOUR', 60],      // 最多60个点
+                    '6h' => ['INTERVAL 6 HOUR', 72],      // 每5分钟一个点
+                    '1d' => ['INTERVAL 1 DAY', 96],       // 每15分钟一个点
+                    '7d' => ['INTERVAL 7 DAY', 168],      // 每小时一个点
+                    '30d' => ['INTERVAL 30 DAY', 120]     // 每6小时一个点
+                ];
+                
+                $interval = $intervals[$timespan] ?? $intervals['7d'];
+                
+                // 使用子查询优化性能
+                $query = "SELECT time_point, in_octets, out_octets, speed 
+                         FROM (
+                             SELECT time_point, in_octets, out_octets, speed,
+                                    ROW_NUMBER() OVER (ORDER BY time_point) as rn,
+                                    COUNT(*) OVER() as total_rows
+                             FROM traffic_history 
+                             WHERE device_id = ? AND if_index = ? 
+                             AND time_point >= DATE_SUB(NOW(), {$interval[0]})
+                             ORDER BY time_point
+                         ) t 
+                         WHERE MOD(rn - 1, GREATEST(1, FLOOR(total_rows / {$interval[1]}))) = 0
+                         ORDER BY time_point";
+                
+                $traffic_data = $Database->getObjectsQuery($query, [$deviceId, $interfaceId]);
+                
+                if ($traffic_data && !empty($traffic_data)) {
+                    $in_data = [];
+                    $out_data = [];
+                    
+                    foreach ($traffic_data as $point) {
+                        if (isset($point->time_point)) {
+                            $timestamp = strtotime($point->time_point) * 1000;
+                            $in_data[] = [$timestamp, floatval($point->in_octets ?? 0) * 8];
+                            $out_data[] = [$timestamp, floatval($point->out_octets ?? 0) * 8];
+                        }
+                    }
+                    
+                    echo json_encode([
+                        'success' => true,
+                        'in_data' => $in_data,
+                        'out_data' => $out_data,
+                        'speed' => floatval($traffic_data[0]->speed ?? 1000000000),
+                        'points' => count($in_data)
+                    ]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => '暂无流量数据']);
+                }
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+    }
+}
+?>
+
+<style>
+/* 极简高效样式 */
+body .container-fluid, body .content { display: none !important; }
+
+.dashboard-system {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    overflow-y: auto;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.header {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    padding: 1.5rem;
+    border-radius: 12px;
+    color: white;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.content {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+}
+
+.btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102,126,234,0.3);
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid #667eea;
+    color: #667eea;
+}
+
+.btn-outline:hover {
+    background: #667eea;
+    color: white;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+}
+
+.card {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 1px solid #eee;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-color: #667eea;
+}
+
+.add-card {
+    border: 2px dashed #667eea;
+    background: #f8f9ff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    color: #667eea;
+}
+
+.add-card:hover {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+}
+
+.modal.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    max-width: 400px;
+    width: 90%;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.traffic-card-header {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 8px 8px 0 0;
+}
+
+.time-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    margin: 0 0.1rem;
+}
+
+.time-btn.active {
+    background: rgba(255,255,255,0.3);
+}
+
+.chart {
+    height: 140px;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    border-radius: 0 0 8px 8px;
+}
+
+.loading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.spinner {
+    width: 16px; height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+    .dashboard-system { padding: 0.5rem; }
+    .grid { grid-template-columns: 1fr; }
+    .section-header { flex-direction: column; gap: 0.5rem; }
+}
+</style>
+
+<div class="dashboard-system">
+    <div class="header">
+        <h1><i class="fa fa-tachometer-alt"></i> 流量监控看板</h1>
+        <p>高性能网络流量监控平台</p>
+    </div>
+
+    <div class="content">
+        <!-- 概览页面 -->
+        <div id="overview-page">
+            <div class="section-header">
+                <h2><i class="fa fa-th-large"></i> 我的看板</h2>
+                <button class="btn btn-primary" onclick="showCreateModal()">
+                    <i class="fa fa-plus"></i> 创建看板
+                </button>
+            </div>
+            <div class="grid" id="dashboard-grid">
+                <div class="loading"><div class="spinner"></div> 加载中...</div>
+            </div>
+        </div>
+
+        <!-- 详情页面 -->
+        <div id="detail-page" style="display: none;">
+            <div class="section-header">
+                <h2 id="detail-title"><i class="fa fa-chart-line"></i> 看板详情</h2>
+                <div>
+                    <button class="btn btn-outline" onclick="showOverview()">
+                        <i class="fa fa-arrow-left"></i> 返回
+                    </button>
+                    <button class="btn btn-primary" onclick="showAddCardModal()">
+                        <i class="fa fa-plus"></i> 添加监控
+                    </button>
+                </div>
+            </div>
+            <div class="grid" id="traffic-grid"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 创建看板模态框 -->
+<div id="create-modal" class="modal">
+    <div class="modal-content">
+        <h3>创建新看板</h3>
+        <div class="form-group">
+            <input type="text" class="form-control" id="dashboard-name" placeholder="看板名称">
+        </div>
+        <div class="form-group">
+            <textarea class="form-control" id="dashboard-desc" rows="2" placeholder="看板描述"></textarea>
+        </div>
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+            <button class="btn" onclick="hideCreateModal()">取消</button>
+            <button class="btn btn-primary" onclick="createDashboard()">创建</button>
+        </div>
+    </div>
+</div>
+
+<!-- 添加监控模态框 -->
+<div id="add-card-modal" class="modal">
+    <div class="modal-content">
+        <h3>添加监控卡片</h3>
+        <div class="form-group">
+            <select class="form-control" id="device-select" onchange="loadInterfaces()">
+                <option value="">选择设备...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <select class="form-control" id="interface-select">
+                <option value="">请先选择设备...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <select class="form-control" id="timespan-select">
+                <option value="1h">1小时</option>
+                <option value="6h">6小时</option>
+                <option value="1d">1天</option>
+                <option value="7d" selected>7天</option>
+                <option value="30d">30天</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+            <button class="btn" onclick="hideAddCardModal()">取消</button>
+            <button class="btn btn-primary" onclick="addTrafficCard()">添加</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 全局变量
+let dashboards = [];
+let currentDashboard = null;
+let devices = [];
+
+// 页面初始化
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('🚀 开始初始化...');
+    const startTime = performance.now();
+    
+    try {
+        loadDashboards();
+        await loadDevices();
+        showOverview();
+        
+        const endTime = performance.now();
+        console.log(`✅ 初始化完成，耗时: ${(endTime - startTime).toFixed(2)}ms`);
+    } catch (error) {
+        console.error('❌ 初始化失败:', error);
+        showNotification('初始化失败，请刷新页面', 'error');
+    }
+});
+
+// 快速加载设备列表
+async function loadDevices() {
+    try {
+        const response = await fetch('?action=get_devices');
+        const data = await response.json();
+        
+        if (data.success) {
+            devices = data.devices;
+            console.log(`📡 加载 ${devices.length} 个设备`);
+        }
+    } catch (error) {
+        console.error('❌ 设备加载失败:', error);
+    }
+}
+
+// 本地存储操作
+function loadDashboards() {
+    const saved = localStorage.getItem('traffic_dashboards');
+    dashboards = saved ? JSON.parse(saved) : [
+        { id: 'default', name: '默认看板', description: '系统默认看板', cards: [], created: new Date().toISOString() }
+    ];
+    if (!saved) saveDashboards();
+}
+
+function saveDashboards() {
+    localStorage.setItem('traffic_dashboards', JSON.stringify(dashboards));
+}
+
+// 页面切换
+function showOverview() {
+    document.getElementById('overview-page').style.display = 'block';
+    document.getElementById('detail-page').style.display = 'none';
+    renderDashboards();
+}
+
+function showDashboard(dashboardId) {
+    currentDashboard = dashboards.find(d => d.id === dashboardId);
+    if (!currentDashboard) return;
+    
+    document.getElementById('overview-page').style.display = 'none';
+    document.getElementById('detail-page').style.display = 'block';
+    document.getElementById('detail-title').innerHTML = `<i class="fa fa-chart-line"></i> ${currentDashboard.name}`;
+    
+    renderTrafficCards();
+}
+
+// 渲染看板列表
+function renderDashboards() {
+    const grid = document.getElementById('dashboard-grid');
+    grid.innerHTML = '';
+    
+    dashboards.forEach(dashboard => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick = () => showDashboard(dashboard.id);
+        card.innerHTML = `
+            <div style="display: flex; justify-content: space-between;">
+                <h3 style="margin: 0; font-size: 1.1rem;">${dashboard.name}</h3>
+                <button class="btn" onclick="event.stopPropagation(); deleteDashboard('${dashboard.id}')" 
+                        style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">
+                    <i class="fa fa-trash"></i>
+                </button>
+            </div>
+            <p style="margin: 0.5rem 0; color: #666; font-size: 0.85rem;">${dashboard.description || '暂无描述'}</p>
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #999;">
+                <span><i class="fa fa-chart-bar"></i> ${dashboard.cards?.length || 0} 个监控</span>
+                <span><i class="fa fa-clock"></i> ${formatDate(dashboard.created)}</span>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+    
+    // 添加创建卡片
+    const addCard = document.createElement('div');
+    addCard.className = 'card add-card';
+    addCard.onclick = showCreateModal;
+    addCard.innerHTML = `
+        <i class="fa fa-plus" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+        <h3 style="margin: 0;">创建新看板</h3>
+    `;
+    grid.appendChild(addCard);
+}
+
+// 渲染监控卡片
+function renderTrafficCards() {
+    const grid = document.getElementById('traffic-grid');
+    grid.innerHTML = '';
+    
+    if (!currentDashboard.cards?.length) {
+        grid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #666;">
+                <i class="fa fa-chart-line" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>
+                <h3>暂无监控卡片</h3>
+                <p>点击"添加监控"创建第一个监控卡片</p>
+            </div>
+        `;
+        return;
+    }
+    
+    currentDashboard.cards.forEach((card, index) => {
+        const cardElement = document.createElement('div');
+        cardElement.className = 'card';
+        cardElement.style.padding = '0';
+        cardElement.innerHTML = `
+            <div class="traffic-card-header">
+                <h4 style="margin: 0; font-size: 0.85rem;">${card.deviceName} - ${card.interfaceName}</h4>
+                <div>
+                    <button class="time-btn ${card.timespan === '1h' ? 'active' : ''}" onclick="changeTimespan(${index}, '1h')">1h</button>
+                    <button class="time-btn ${card.timespan === '6h' ? 'active' : ''}" onclick="changeTimespan(${index}, '6h')">6h</button>
+                    <button class="time-btn ${card.timespan === '1d' ? 'active' : ''}" onclick="changeTimespan(${index}, '1d')">1d</button>
+                    <button class="time-btn ${card.timespan === '7d' ? 'active' : ''}" onclick="changeTimespan(${index}, '7d')">7d</button>
+                    <button onclick="removeCard(${index})" style="background: none; border: none; color: rgba(255,255,255,0.8); margin-left: 0.5rem; cursor: pointer;">×</button>
+                </div>
+            </div>
+            <div class="chart" id="chart-${index}">
+                <div class="loading"><div class="spinner"></div> 加载中...</div>
+            </div>
+        `;
+        grid.appendChild(cardElement);
+        
+        loadChartData(index, card);
+    });
+}
+
+// 工具函数
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const days = Math.floor((new Date() - date) / (1000 * 60 * 60 * 24));
+    return days === 0 ? '今天' : days === 1 ? '昨天' : days < 7 ? `${days}天前` : date.toLocaleDateString();
+}
+
+function formatSpeed(bps) {
+    const units = ['bps', 'Kbps', 'Mbps', 'Gbps'];
+    let value = bps, unitIndex = 0;
+    while (value >= 1000 && unitIndex < units.length - 1) {
+        value /= 1000;
+        unitIndex++;
+    }
+    return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+// 模态框操作
+function showCreateModal() {
+    document.getElementById('create-modal').classList.add('show');
+    document.getElementById('dashboard-name').focus();
+}
+
+function hideCreateModal() {
+    document.getElementById('create-modal').classList.remove('show');
+    document.getElementById('dashboard-name').value = '';
+    document.getElementById('dashboard-desc').value = '';
+}
+
+function showAddCardModal() {
+    if (!currentDashboard) return;
+    
+    const deviceSelect = document.getElementById('device-select');
+    deviceSelect.innerHTML = '<option value="">选择设备...</option>';
+    devices.forEach(device => {
+        const option = document.createElement('option');
+        option.value = device.id;
+        option.textContent = `${device.hostname} (${device.ip_addr})`;
+        deviceSelect.appendChild(option);
+    });
+    
+    document.getElementById('add-card-modal').classList.add('show');
+}
+
+function hideAddCardModal() {
+    document.getElementById('add-card-modal').classList.remove('show');
+    document.getElementById('interface-select').innerHTML = '<option value="">请先选择设备...</option>';
+}
+
+// 看板操作
+function createDashboard() {
+    const name = document.getElementById('dashboard-name').value.trim();
+    const description = document.getElementById('dashboard-desc').value.trim();
+    
+    if (!name) {
+        showNotification('请输入看板名称', 'error');
+        return;
+    }
+    
+    dashboards.push({
+        id: Date.now().toString(),
+        name, description,
+        cards: [],
+        created: new Date().toISOString()
+    });
+    
+    saveDashboards();
+    hideCreateModal();
+    renderDashboards();
+    showNotification('看板创建成功！', 'success');
+}
+
+function deleteDashboard(dashboardId) {
+    if (!confirm('确定删除此看板？')) return;
+    
+    dashboards = dashboards.filter(d => d.id !== dashboardId);
+    saveDashboards();
+    renderDashboards();
+    showNotification('看板已删除', 'info');
+}
+
+// 接口加载
+async function loadInterfaces() {
+    const deviceId = document.getElementById('device-select').value;
+    const interfaceSelect = document.getElementById('interface-select');
+    
+    if (!deviceId) {
+        interfaceSelect.innerHTML = '<option value="">请先选择设备...</option>';
+        return;
+    }
+    
+    interfaceSelect.innerHTML = '<option value="">加载中...</option>';
+    
+    try {
+        const response = await fetch(`?action=get_interfaces&deviceId=${deviceId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            interfaceSelect.innerHTML = '<option value="">选择接口...</option>';
+            data.interfaces.forEach(interface => {
+                const option = document.createElement('option');
+                option.value = interface.if_index;
+                option.textContent = `${interface.if_name} (${interface.if_description || '无描述'})`;
+                interfaceSelect.appendChild(option);
+            });
+        } else {
+            interfaceSelect.innerHTML = '<option value="">加载失败</option>';
+        }
+    } catch (error) {
+        interfaceSelect.innerHTML = '<option value="">网络错误</option>';
+    }
+}
+
+// 卡片操作
+function addTrafficCard() {
+    const deviceId = document.getElementById('device-select').value;
+    const interfaceId = document.getElementById('interface-select').value;
+    const timespan = document.getElementById('timespan-select').value;
+    
+    if (!deviceId || !interfaceId) {
+        showNotification('请选择设备和接口', 'error');
+        return;
+    }
+    
+    const deviceName = document.getElementById('device-select').options[document.getElementById('device-select').selectedIndex].text;
+    const interfaceName = document.getElementById('interface-select').options[document.getElementById('interface-select').selectedIndex].text;
+    
+    currentDashboard.cards = currentDashboard.cards || [];
+    currentDashboard.cards.push({
+        deviceId, interfaceId, deviceName, interfaceName, timespan,
+        created: new Date().toISOString()
+    });
+    
+    saveDashboards();
+    hideAddCardModal();
+    renderTrafficCards();
+    showNotification('监控卡片添加成功！', 'success');
+}
+
+function removeCard(index) {
+    if (!confirm('确定移除此监控卡片？')) return;
+    
+    currentDashboard.cards.splice(index, 1);
+    saveDashboards();
+    renderTrafficCards();
+    showNotification('卡片已移除', 'info');
+}
+
+function changeTimespan(index, timespan) {
+    currentDashboard.cards[index].timespan = timespan;
+    saveDashboards();
+    renderTrafficCards();
+}
+
+// 图表数据加载
+async function loadChartData(index, card) {
+    const chartElement = document.getElementById(`chart-${index}`);
+    
+    try {
+        const response = await fetch(`?action=get_traffic_data&deviceId=${card.deviceId}&interfaceId=${card.interfaceId}&timespan=${card.timespan}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            chartElement.innerHTML = `
+                <div style="text-align: center;">
+                    <div style="margin-bottom: 0.5rem;">
+                        <span style="color: #667eea;">● 入流量</span>
+                        <span style="margin-left: 1rem; color: #48c6ef;">● 出流量</span>
+                    </div>
+                    <div style="font-size: 0.8rem; color: #666;">
+                        ${data.points || 0} 个数据点 | 链路速度: ${formatSpeed(data.speed)}
+                    </div>
+                </div>
+            `;
+        } else {
+            chartElement.innerHTML = `
+                <div style="text-align: center; color: #dc3545;">
+                    <i class="fa fa-exclamation-triangle"></i>
+                    <div style="margin-top: 0.5rem;">${data.error}</div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        chartElement.innerHTML = `
+            <div style="text-align: center; color: #dc3545;">
+                <i class="fa fa-times"></i>
+                <div style="margin-top: 0.5rem;">网络错误</div>
+            </div>
+        `;
+    }
+}
+
+// 通知系统
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed; top: 20px; right: 20px;
+        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#667eea'};
+        color: white; padding: 0.75rem 1rem; border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 3000;
+        animation: slideIn 0.3s ease;
+    `;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 2500);
+}
+
+// 事件处理
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal')) {
+        e.target.classList.remove('show');
+    }
+});
+
+// 添加样式
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+`;
+document.head.appendChild(style);
+</script> 

@@ -950,7 +950,7 @@ table#subnetsMenu td#subnetsLeft .menu-subnets {
 	margin-top: 20px;
 }
 table#subnetsMenu td#subnetsContent {
-	padding-top: 20px;
+	padding-top: 0px;
 }
 
 

@@ -21,8 +21,8 @@ print "<div class='ip_vis'>";
 
 # we need to reindex addresses to have ip address in decimal as key!
 $visual_addresses = array();
-if($addresses_visual) {
-	foreach($addresses_visual as $a) {
+if($addresses) {
+	foreach($addresses as $a) {
 		$visual_addresses[$a->ip_addr] = (array) $a;
 	}
 }

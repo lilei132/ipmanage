@@ -84,7 +84,7 @@ if($User->is_admin(false)) {
 
 	<!-- Dash lock/unlock -->
 	<?php if($GET->page=="dashboard" && !($User->is_admin(false)!==true && (is_blank($User->user->groups) || $User->user->groups==="null") ) ) { ?>
-		<li>
+		<li class="w-lock">
 			<a href="#" rel='tooltip' data-placement='bottom' title="<?php print _('Click to reorder widgets'); ?>"><i class='fa fa-dashboard'></i></a>
 		</li>
 	<?php } ?>

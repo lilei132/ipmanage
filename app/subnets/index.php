@@ -148,26 +148,31 @@ if ($User->settings->enableNAT==1) {
 		?>
 	</div>
 
-	<!-- addresses -->
-	<div class="col-xs-12 ipaddresses_overlay">
-		<?php
-		if(!$slaves) {
-			$addresses = $Addresses->fetch_subnet_addresses ($subnet['id']);
-			include('addresses/print-address-table.php');
-		}
-		?>
-	</div>
-
 	<!-- visual subnet display -->
 	<div class="col-xs-12">
 	<?php
 		if(!$slaves && $User->settings->visualLimit > 0) {
+			# fetch addresses for visual display
+			$addresses = $Addresses->fetch_subnet_addresses ($subnet['id']);
 			$max_visual_hosts_subnet = (object) ['subnet'=>'10.0.0.0', 'mask'=>$User->settings->visualLimit, 'isPool'=>true];
 			if($Subnets->max_hosts($subnet) <= $Subnets->max_hosts($max_visual_hosts_subnet)) {
 				include('subnet-visual.php');
 			}
 	}
 	?>
+	</div>
+
+	<!-- addresses -->
+	<div class="col-xs-12 ipaddresses_overlay">
+		<?php
+		if(!$slaves) {
+			# addresses already fetched for visual display above, if not fetched yet, fetch now
+			if(!isset($addresses)) {
+				$addresses = $Addresses->fetch_subnet_addresses ($subnet['id']);
+			}
+			include('addresses/print-address-table.php');
+		}
+		?>
 	</div>
 
 	<!-- orphaned addresses -->

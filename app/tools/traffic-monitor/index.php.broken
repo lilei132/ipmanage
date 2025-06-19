@@ -6,120 +6,178 @@
 # 引入函数文件
 require_once dirname(__FILE__) . "/../../../functions/functions.php";
 
-# 处理Ajax请求时，先检查是否需要显示页面
-$isAjaxRequest = isset($_GET['getTrafficData']) || isset($_POST['getTrafficData']);
-
-if (!$isAjaxRequest) {
-    # 确认用户登录
-    $User->check_user_session();
-
-    # 检查用户权限
-    if ($User->get_module_permissions("devices") < User::ACCESS_R) {
-        $Result->show("danger", _("无权访问此页面"), true);
-        die();
-    }
-}
-
-# 只有在非Ajax请求时才获取设备列表
-if (!$isAjaxRequest) {
-    # 获取所有支持SNMP的设备
-    $devices = $Database->getObjects("devices", "snmp_version", "!=0");
-}
-
-# 处理获取流量数据请求
-if (isset($_GET['getTrafficData']) || isset($_POST['getTrafficData'])) {
-    // 开启PHP错误展示，方便调试
-    ini_set('display_errors', 1);
-    error_reporting(E_ALL);
+# 处理AJAX请求 - 在主页面中处理避免会话问题
+if ((isset($_GET['getTrafficData']) || isset($_POST['getTrafficData']) || 
+     isset($_GET['getDeviceInterfaces']) || isset($_POST['getDeviceInterfaces'])) &&
+    (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest')) {
     
-    // 禁用响应缓存
+    # 设置JSON响应头
+    header('Content-Type: application/json');
+}
+
+# 处理AJAX请求
+if ((isset($_GET['getTrafficData']) || isset($_POST['getTrafficData']) || 
+     isset($_GET['getDeviceInterfaces']) || isset($_POST['getDeviceInterfaces'])) &&
+    (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest')) {
+    
+    # 设置JSON响应头
+    header('Content-Type: application/json');
     header('Cache-Control: no-cache, must-revalidate');
     header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
-    header('Content-Type: application/json');
-    
-    // 获取请求参数
-    $deviceId = isset($_REQUEST['deviceId']) ? $_REQUEST['deviceId'] : null;
-    $interfaceId = isset($_REQUEST['interfaceId']) ? $_REQUEST['interfaceId'] : null;
-    $timespan = isset($_REQUEST['timespan']) ? $_REQUEST['timespan'] : '7d';
-    
-    // 记录请求信息
-    error_log("流量数据请求: deviceId = $deviceId, interfaceId = $interfaceId, timespan = $timespan");
-    
-    if (!$deviceId || !$interfaceId) {
-        echo json_encode(['success' => false, 'error' => '缺少必要参数']);
-        die();
-    }
-    
-    try {
-        $Traffic = new Traffic($Database);
-        
-        try {
-            // 从数据库获取真实数据
-            $traffic_data = $Traffic->get_interface_history($deviceId, $interfaceId, $timespan);
-            
-            if ($traffic_data === false || empty($traffic_data)) {
-                error_log("无法从数据库获取流量数据: deviceId = $deviceId, interfaceId = $interfaceId");
-                echo json_encode(['success' => false, 'error' => '没有找到流量数据']);
-                die();
-            } else {
-                error_log("成功从数据库获取流量数据: " . count($traffic_data) . " 个数据点");
-            }
-        } catch (Exception $db_error) {
-            error_log("数据库查询错误: " . $db_error->getMessage());
-            echo json_encode(['success' => false, 'error' => '数据库查询失败: ' . $db_error->getMessage()]);
-            die();
-        }
-        
-        // 格式化数据为Canvas可用的格式
-        $in_data = [];
-        $out_data = [];
-        
-        foreach ($traffic_data as $point) {
-            // 确保时间点格式正确
-            if (isset($point->time_point) && $point->time_point) {
-                $timestamp = strtotime($point->time_point) * 1000; // 转换为JavaScript时间戳(毫秒)
-                
-                // 确保流量值为数字
-                $in_octets = isset($point->in_octets) ? floatval($point->in_octets) * 8 : 0; // 转换为比特
-                $out_octets = isset($point->out_octets) ? floatval($point->out_octets) * 8 : 0; // 转换为比特
-                
-                $in_data[] = [$timestamp, $in_octets];
-                $out_data[] = [$timestamp, $out_octets];
-            }
-        }
-        
-        // 记录成功信息
-        error_log("流量数据格式化成功: 入流量 " . count($in_data) . " 个点, 出流量 " . count($out_data) . " 个点");
-        
-        // 设置链路速度
-        $speed = isset($traffic_data[0]->speed) ? floatval($traffic_data[0]->speed) : 1000000000; // 默认1Gbps
-        
-        echo json_encode([
-            'success' => true,
-            'in_data' => $in_data,
-            'out_data' => $out_data,
-            'speed' => $speed
-        ]);
-    } catch (Exception $e) {
-        error_log("获取流量数据时出错: deviceId = $deviceId, interfaceId = $interfaceId, error = " . $e->getMessage());
-        error_log("错误堆栈: " . $e->getTraceAsString());
-        
-        // 返回更详细的错误信息
-        echo json_encode([
-            'success' => false, 
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine()
-        ]);
-    }
-    
-    die();
+    header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
 }
 
+# 处理AJAX请求
+if ((isset($_GET['getTrafficData']) || isset($_POST['getTrafficData']) || 
+     isset($_GET['getDeviceInterfaces']) || isset($_POST['getDeviceInterfaces'])) &&
+    (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest')) {
+    
+    # 设置JSON响应头
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache, must-revalidate');
+    header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+    
+    try {
+        # 处理获取流量数据请求
+        if (isset($_GET['getTrafficData']) || isset($_POST['getTrafficData'])) {
+            
+            # 获取请求参数
+            $deviceId = isset($_REQUEST['deviceId']) ? intval($_REQUEST['deviceId']) : null;
+            $interfaceId = isset($_REQUEST['interfaceId']) ? $_REQUEST['interfaceId'] : null;
+            $timespan = isset($_REQUEST['timespan']) ? $_REQUEST['timespan'] : '7d';
+            
+            # 记录请求信息
+            error_log("流量数据请求: deviceId = $deviceId, interfaceId = $interfaceId, timespan = $timespan");
+            
+            if (!$deviceId || !$interfaceId) {
+                echo json_encode(['success' => false, 'error' => '缺少必要参数']);
+                exit;
+            }
+            
+            try {
+                $Traffic = new Traffic($Database);
+                $traffic_data = $Traffic->get_interface_history($deviceId, $interfaceId, $timespan);
+                
+                if ($traffic_data === false || empty($traffic_data)) {
+                    error_log("无法从数据库获取流量数据: deviceId = $deviceId, interfaceId = $interfaceId");
+                    echo json_encode(['success' => false, 'error' => '没有找到流量数据']);
+                    exit;
+                }
+                
+                error_log("成功从数据库获取流量数据: " . count($traffic_data) . " 个数据点");
+                
+                # 格式化数据为Canvas可用的格式
+                $in_data = [];
+                $out_data = [];
+                $speed = 1000000000; # 默认1Gbps
+                
+                foreach ($traffic_data as $point) {
+                    if (isset($point->time_point) && $point->time_point) {
+                        $timestamp = strtotime($point->time_point) * 1000; # 转换为JavaScript时间戳(毫秒)
+                        
+                        # 确保流量值为数字，转换为比特
+                        $in_octets = isset($point->in_octets) ? floatval($point->in_octets) * 8 : 0;
+                        $out_octets = isset($point->out_octets) ? floatval($point->out_octets) * 8 : 0;
+                        
+                        $in_data[] = [$timestamp, $in_octets];
+                        $out_data[] = [$timestamp, $out_octets];
+                        
+                        # 获取链路速度
+                        if (isset($point->speed) && $point->speed > 0) {
+                            $speed = floatval($point->speed);
+                        }
+                    }
+                }
+                
+                error_log("流量数据格式化成功: 入流量 " . count($in_data) . " 个点, 出流量 " . count($out_data) . " 个点");
+                
+                echo json_encode([
+                    'success' => true,
+                    'in_data' => $in_data,
+                    'out_data' => $out_data,
+                    'speed' => $speed
+                ]);
+                
+            } catch (Exception $e) {
+                error_log("获取流量数据时出错: " . $e->getMessage() . " 在文件 " . $e->getFile() . " 第 " . $e->getLine() . " 行");
+                
+                echo json_encode([
+                    'success' => false, 
+                    'error' => $e->getMessage()
+                ]);
+            }
+            
+            exit;
+        }
+        
+        # 处理接口数据请求
+        if (isset($_GET['getDeviceInterfaces']) || isset($_POST['getDeviceInterfaces'])) {
+            
+            # 获取设备ID
+            $deviceId = isset($_REQUEST['getDeviceInterfaces']) ? $_REQUEST['getDeviceInterfaces'] : null;
+            
+            if (!$deviceId) {
+                echo json_encode(['success' => false, 'message' => '缺少设备ID参数']);
+                exit;
+            }
+            
+            # 记录请求信息便于调试
+            error_log("接口数据请求: deviceId = $deviceId");
+            
+            $Traffic = new Traffic($Database);
+            
+            try {
+                $interfaces = $Traffic->get_device_interfaces($deviceId);
+                
+                if ($interfaces !== false && !empty($interfaces)) {
+                    $formatted_interfaces = [];
+                    foreach ($interfaces as $interface) {
+                        $formatted_interfaces[] = [
+                            'if_index' => $interface->if_index,
+                            'if_name' => $interface->if_name,
+                            'if_description' => $interface->if_description,
+                            'speed' => $interface->speed
+                        ];
+                    }
+                    
+                    # 记录成功信息
+                    error_log("接口数据获取成功: " . count($formatted_interfaces) . " 个接口");
+                    
+                    echo json_encode([
+                        'success' => true,
+                        'interfaces' => $formatted_interfaces
+                    ]);
+                } else {
+                    error_log("未找到接口数据, deviceId = $deviceId");
+                    echo json_encode([
+                        'success' => false,
+                        'message' => '未找到接口数据',
+                        'interfaces' => []
+                    ]);
+                }
+            } catch (Exception $e) {
+                error_log("获取接口数据错误: deviceId = $deviceId, error = " . $e->getMessage());
+                error_log("错误堆栈: " . $e->getTraceAsString());
+                echo json_encode([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ]);
+            }
+            
+            exit;
+        }
+        
+    } catch (Exception $e) {
+        error_log("AJAX请求处理错误: " . $e->getMessage());
+        echo json_encode(['success' => false, 'error' => '服务器内部错误: ' . $e->getMessage()]);
+        exit;
+    }
+}
 
+# 获取所有支持SNMP的设备
+$devices = $Database->getObjects("devices", "snmp_version", "!=0");
 
-// 处理常规页面请求
+# 处理常规页面请求
 ?>
 
 <h4><?php print _("流量监控"); ?></h4>
@@ -128,8 +186,6 @@ if (isset($_GET['getTrafficData']) || isset($_POST['getTrafficData'])) {
 <div class="alert alert-info">
     <i class="fa fa-info-circle"></i> <?php print _("选择设备和接口以监控流量。每个卡片将显示实时流量数据。可以添加多个卡片同时监控不同设备的不同接口。"); ?>
 </div>
-
-
 
 <!-- 页面控制按钮 - 移到页面顶部 -->
 <div class="page-controls-wrapper">
@@ -166,7 +222,7 @@ if (isset($_GET['getTrafficData']) || isset($_POST['getTrafficData'])) {
                     <select id="device-select" class="form-control">
                         <option value=""><?php print _("请选择设备..."); ?></option>
                         <?php
-                        if (isset($devices) && $devices !== false) {
+                        if ($devices !== false) {
                             foreach ($devices as $device) {
                                 echo "<option value='{$device->id}'>{$device->hostname} ({$device->ip_addr})</option>";
                             }
@@ -242,7 +298,7 @@ if (isset($_GET['getTrafficData']) || isset($_POST['getTrafficData'])) {
 <!-- 移除Flot库引用，改用原生Canvas API -->
 
 <script>
-// 接口数据缓存（按需异步加载）
+// 接口数据缓存
 const deviceInterfaces = {};
 
 $(document).ready(function() {
@@ -273,90 +329,69 @@ $(document).ready(function() {
         // 显示加载状态
         interfaceSelect.html('<option value=""><?php print _("加载中..."); ?></option>');
         interfaceSelect.prop('disabled', true);
+        $('#add-card-btn').prop('disabled', true);
         
-        // 检查缓存中是否已有接口数据
-        if (deviceInterfaces && deviceInterfaces[deviceId] && deviceInterfaces[deviceId].length > 0) {
-            console.log('使用缓存的接口数据:', deviceInterfaces[deviceId].length, '个接口');
+        // 检查是否已有缓存的接口数据
+        if (deviceInterfaces[deviceId] && deviceInterfaces[deviceId].length > 0) {
+            console.log('使用缓存的接口数据:', deviceId);
             populateInterfaceSelect(interfaceSelect, deviceInterfaces[deviceId]);
             return;
         }
         
-        // 显示加载进度
-        interfaceSelect.html('<option value="">⏳ 正在加载接口...</option>');
-        
         // 异步从服务器获取接口列表
-        console.log('异步加载设备接口:', deviceId);
         $.ajax({
-            url: '/app/tools/traffic-monitor/ajax_get_interfaces.php',
+            url: window.location.href.split('?')[0] + '?page=tools&section=traffic-monitor',
             method: 'GET',
             data: {
-                deviceId: deviceId
+                getDeviceInterfaces: deviceId
             },
             dataType: 'json',
+            headers: { "X-Requested-With": "XMLHttpRequest" },
             timeout: 10000, // 10秒超时
             success: function(data) {
                 console.log('接口数据响应:', data);
-                // 为可能的不同响应格式做兼容处理
-                // 1. 如果是数组格式
+                
+                let interfaces = [];
+                
+                // 处理不同的响应格式
                 if (Array.isArray(data)) {
-                    deviceInterfaces[deviceId] = data;
-                    populateInterfaceSelect(interfaceSelect, data);
-                    return;
-                }
-                
-                // 2. 如果是对象格式且有success属性
-                if (data && data.success && data.interfaces && Array.isArray(data.interfaces)) {
-                    deviceInterfaces[deviceId] = data.interfaces;
-                    populateInterfaceSelect(interfaceSelect, data.interfaces);
-                    return;
-                }
-                
-                // 3. 如果没有结构但是有数据
-                if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+                    interfaces = data;
+                } else if (data && data.success && data.interfaces && Array.isArray(data.interfaces)) {
+                    interfaces = data.interfaces;
+                } else if (data && typeof data === 'object' && Object.keys(data).length > 0) {
                     // 尝试将对象转换为数组
-                    let interfacesArray = [];
                     for (let key in data) {
                         if (data.hasOwnProperty(key) && typeof data[key] === 'object') {
-                            // 添加if_index属性如果没有
                             if (!data[key].if_index && key) {
                                 data[key].if_index = key;
                             }
-                            interfacesArray.push(data[key]);
+                            interfaces.push(data[key]);
                         }
-                    }
-                    
-                    if (interfacesArray.length > 0) {
-                        deviceInterfaces[deviceId] = interfacesArray;
-                        populateInterfaceSelect(interfaceSelect, interfacesArray);
-                        return;
                     }
                 }
                 
-                // 处理失败情况
-                interfaceSelect.html('<option value=""><?php print _("未找到接口数据"); ?></option>');
-                interfaceSelect.prop('disabled', true);
-                $('#add-card-btn').prop('disabled', true);
+                if (interfaces.length > 0) {
+                    // 缓存接口数据
+                    deviceInterfaces[deviceId] = interfaces;
+                    populateInterfaceSelect(interfaceSelect, interfaces);
+                } else {
+                    interfaceSelect.html('<option value=""><?php print _("未找到接口数据"); ?></option>');
+                    interfaceSelect.prop('disabled', true);
+                }
             },
             error: function(jqXHR, textStatus, errorThrown) {
                 console.error('加载接口失败:', textStatus, errorThrown);
                 console.error('错误详情:', jqXHR.responseText);
                 interfaceSelect.html('<option value=""><?php print _("加载接口失败"); ?></option>');
                 interfaceSelect.prop('disabled', true);
-                $('#add-card-btn').prop('disabled', true);
             }
         });
     });
-    
-    // 填充接口选择下拉框的辅助函数
+
+    // 填充接口选择框的通用函数
     function populateInterfaceSelect(interfaceSelect, interfaces) {
         interfaceSelect.empty();
         interfaceSelect.append('<option value=""><?php print _("请选择接口..."); ?></option>');
-        
-        if (!interfaces || interfaces.length === 0) {
-            interfaceSelect.prop('disabled', true);
-            $('#add-card-btn').prop('disabled', true);
-            return;
-        }
         
         $.each(interfaces, function(i, iface) {
             let label = iface.if_name || 'Interface ' + iface.if_index;
@@ -366,7 +401,7 @@ $(document).ready(function() {
             if (iface.speed) {
                 try {
                     const speedValue = parseFloat(iface.speed);
-                    if (!isNaN(speedValue) && speedValue > 0) {
+                    if (!isNaN(speedValue)) {
                         label += ' - ' + formatSpeed(speedValue);
                     }
                 } catch (e) {
@@ -380,8 +415,6 @@ $(document).ready(function() {
         
         interfaceSelect.prop('disabled', false);
         $('#add-card-btn').prop('disabled', false);
-        
-        console.log('成功填充', interfaces.length, '个接口到下拉框');
     }
 
     // 监听添加卡片按钮点击事件
@@ -604,7 +637,7 @@ $(document).ready(function() {
         // 设置自动刷新
         refreshTimers[chartId] = setInterval(function() {
             loadTrafficData(cardObject);
-        }, 600000); // 每10分钟刷新一次
+        }, 60000); // 每分钟刷新一次
         
         // 当添加新卡片时，自动滚动到该卡片
         setTimeout(function() {
@@ -1053,18 +1086,21 @@ $(document).ready(function() {
         
         console.log('开始加载流量数据:', card.deviceId, card.interfaceId, card.timespan);
         
-        // 获取流量数据
+        // 获取流量数据 - 使用专用AJAX接口
         $.ajax({
-            url: '/app/tools/traffic-monitor/ajax_get_traffic.php',  // 使用真实数据接口
+            url: window.location.href.split('?')[0] + '?page=tools&section=traffic-monitor',
             method: 'GET',
             data: {
+                getTrafficData: true,
                 deviceId: card.deviceId,
                 interfaceId: card.interfaceId,
                 timespan: card.timespan,
                 _: new Date().getTime() // 添加时间戳参数防止缓存
             },
             dataType: 'json',
+            headers: { "X-Requested-With": "XMLHttpRequest" },
             cache: false, // 确保不使用缓存
+            timeout: 15000, // 15秒超时
             success: function(response) {
                 try {
                     console.log('流量数据响应:', response);

@@ -1752,6 +1752,10 @@ class Common_functions  {
 	 * @return string
 	 */
 	public function print_custom_field_name ($name) {
+		// Special case for internal_ip field
+		if ($name === 'internal_ip') {
+			return _('内网地址');
+		}
 		return strpos($name, "custom_")===0 ? _(substr($name, 7)) : _($name);
 	}
 

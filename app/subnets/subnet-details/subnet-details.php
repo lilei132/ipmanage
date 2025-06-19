@@ -121,12 +121,11 @@ else {
 	</tr>
 	<?php }} ?>
 
-	<?php if($User->get_module_permissions ("vlan")>=User::ACCESS_R) { ?>
+	<?php if($User->get_module_permissions ("vlan")>=User::ACCESS_R && (!empty($vlan['number']) && $vlan['number'] != 0)) { ?>
 	<tr>
 		<th><?php print _('VLAN'); ?></th>
 		<td>
 		<?php
-		if(empty($vlan['number']) || $vlan['number'] == 0) { $vlan['number'] = "<span class='text-muted'>/</span>"; }	//Display fix for emprt VLAN
 		print $vlan['number'];
 
 		if(!empty($vlan['name'])) 		 { print ' - '.$vlan['name']; }					//Print name if provided
@@ -146,104 +145,76 @@ else {
 	if($User->settings->enableVRF==1 && $User->get_module_permissions ("vrf")>=User::ACCESS_R) {
 		# get vrf details
 		$vrf = $Tools->fetch_object("vrf", "vrfId" ,$subnet['vrfId']);
-		# null
-		if($vrf===false) {
-			$vrfText = "<span class='text-muted'>"._("None")."</span>";
-		}
-		else {
+		# only show if VRF is defined
+		if($vrf!==false) {
 			# set text
 			$vrfText = "<a href='".create_link("tools","vrf",$vrf->vrfId)."' target='_blank'>".$vrf->name."</a>";
 			if(!empty($vrf->description)) { $vrfText .= " [$vrf->description]";}
-		}
 
-		print "<tr>";
-		print "	<th>"._('VRF')."</th>";
-		print "	<td>$vrfText</td>";
-		print "</tr>";
+			print "<tr>";
+			print "	<th>"._('VRF')."</th>";
+			print "	<td>$vrfText</td>";
+			print "</tr>";
+		}
 
 		$vrf = (array) $vrf;
 	}
 	?>
 
 	<!-- nameservers -->
+	<?php if(!empty($subnet['nameserverId'])) { ?>
 	<tr>
 		<th><?php print _('Nameservers'); ?></th>
 		<td>
 		<?php
-
-		// Only show nameservers if defined for subnet
-		if(!empty($subnet['nameserverId'])) {
-			# fetch recursive nameserver details
-			$nameservers = $Tools->fetch_object("nameservers", "id", $subnet['nameserverId']);
-			print str_replace(";", ", ", $nameservers->namesrv1);
-			//Print name of nameserver group
-			print ' ('.$nameservers->name.')';
-		}
-
-		else {
-			print "<span class='text-muted'>/</span>";
-		}
+		# fetch recursive nameserver details
+		$nameservers = $Tools->fetch_object("nameservers", "id", $subnet['nameserverId']);
+		print str_replace(";", ", ", $nameservers->namesrv1);
+		//Print name of nameserver group
+		print ' ('.$nameservers->name.')';
 		?>
 		</td>
 	</tr>
+	<?php } ?>
 
 	<!-- Customers -->
-	<?php if($User->get_module_permissions ("customers")>=User::ACCESS_R) { ?>
+	<?php if($User->get_module_permissions ("customers")>=User::ACCESS_R && !empty($subnet['customer_id'])) { ?>
 	<tr>
 		<th><?php print _('Customer'); ?></th>
 		<td>
 		<?php
-
-		if(!empty($subnet['customer_id'])) {
-			# fetch recursive nameserver details
-			$customer = $Tools->fetch_object("customers", "id", $subnet['customer_id']);
-			if ($customer!==false) {
-				print $customer->title." <a target='_blank' href='".create_link("tools","customers",$customer->title)."'><i class='fa fa-external-link'></i></a>";
-			}
-			else {
-				print "<span class='text-muted'>/</span>";
-			}
-		}
-		else {
-			print "<span class='text-muted'>/</span>";
+		# fetch recursive nameserver details
+		$customer = $Tools->fetch_object("customers", "id", $subnet['customer_id']);
+		if ($customer!==false) {
+			print $customer->title." <a target='_blank' href='".create_link("tools","customers",$customer->title)."'><i class='fa fa-external-link'></i></a>";
 		}
 		?>
 		</td>
 	</tr>
 	<?php } ?>
 
-	<?php if($User->get_module_permissions ("devices")>=User::ACCESS_R) { ?>
+	<?php if($User->get_module_permissions ("devices")>=User::ACCESS_R && !empty($subnet['device'])) { ?>
 	<!-- devices -->
 	<tr>
 		<th><?php print _('Device'); ?></th>
 		<td>
 		<?php
-
-		// Only show device if defined for subnet
-		if(!empty($subnet['device'])) {
-			# fetch recursive nameserver details
-			$device = $Tools->fetch_object("devices", "id", $subnet['device']);
-			if (is_object($device)) {
-				# rack
-				$rack_text = "";
-				if ($User->settings->enableRACK=="1" && !is_blank($device->rack) && $User->get_module_permissions ("racks")>=User::ACCESS_RW) {
-					if (!isset($Racks)) $Racks = new phpipam_rack($Database);
-					$Racks->add_rack_start_print($device);
-					$rack = $Tools->fetch_object("racks", "id", $device->rack);
-					$rack_text = !is_object($rack) ? "" : "<br><span class='badge badge1 badge5' style='padding-top:4px;'>$rack->name / "._('Position').": $device->rack_start_print "._("Size").": $device->rack_size U <i class='btn btn-default btn-xs fa fa-server showRackPopup' data-rackId='$rack->id' data-deviceId='$device->id'></i></span>";
-				}
-				print "<a href='".create_link("tools","devices",$device->id)."'>".$device->hostname."</a>";
-				if (!is_blank($device->description)) {
-					print ' ('.$device->description.')';
-				}
-				print $rack_text;
+		# fetch recursive nameserver details
+		$device = $Tools->fetch_object("devices", "id", $subnet['device']);
+		if (is_object($device)) {
+			# rack
+			$rack_text = "";
+			if ($User->settings->enableRACK=="1" && !is_blank($device->rack) && $User->get_module_permissions ("racks")>=User::ACCESS_RW) {
+				if (!isset($Racks)) $Racks = new phpipam_rack($Database);
+				$Racks->add_rack_start_print($device);
+				$rack = $Tools->fetch_object("racks", "id", $device->rack);
+				$rack_text = !is_object($rack) ? "" : "<br><span class='badge badge1 badge5' style='padding-top:4px;'>$rack->name / "._('Position').": $device->rack_start_print "._("Size").": $device->rack_size U <i class='btn btn-default btn-xs fa fa-server showRackPopup' data-rackId='$rack->id' data-deviceId='$device->id'></i></span>";
 			}
-			else {
-				print "<span class='text-muted'>/</span>";
+			print "<a href='".create_link("tools","devices",$device->id)."'>".$device->hostname."</a>";
+			if (!is_blank($device->description)) {
+				print ' ('.$device->description.')';
 			}
-		}
-		else {
-			print "<span class='text-muted'>/</span>";
+			print $rack_text;
 		}
 		?>
 		</td>
@@ -251,24 +222,16 @@ else {
 	<?php } ?>
 
 	<!-- Location -->
-	<?php if($User->settings->enableLocations=="1" && $User->get_module_permissions ("locations")>=User::ACCESS_R) { ?>
+	<?php if($User->settings->enableLocations=="1" && $User->get_module_permissions ("locations")>=User::ACCESS_R && !empty($subnet['location']) && $subnet['location']!=0) { ?>
 	<tr>
 		<th><?php print _('Location'); ?></th>
 		<td>
 		<?php
-
-		// Only show nameservers if defined for subnet
-		if(!empty($subnet['location']) && $subnet['location']!=0) {
-			# fetch recursive nameserver details
-			$location2 = $Tools->fetch_object("locations", "id", $subnet['location']);
-            if($location2!==false) {
-                print "<a href='".create_link("subnets", $subnet['sectionId'], $subnet['id'], "location")."'>$location2->name</a>";
-            }
-		}
-
-		else {
-			print "<span class='text-muted'>/</span>";
-		}
+		# fetch recursive nameserver details
+		$location2 = $Tools->fetch_object("locations", "id", $subnet['location']);
+        if($location2!==false) {
+            print "<a href='".create_link("subnets", $subnet['sectionId'], $subnet['id'], "location")."'>$location2->name</a>";
+        }
 		?>
 		</td>
 	</tr>
@@ -290,15 +253,12 @@ else {
     </tr>
     <?php } ?>
 
-	<?php if($subnet_permission==3) { ?>
+	<?php if($subnet_permission==3 && !is_blank($subnet['editDate'])) { ?>
     <tr>
     	<th><?php print _("Last edited"); ?></th>
     	<td>
     		<span class="text-muted">
-    		<?php
-    		if(!is_blank($subnet['editDate']))  	{ print $subnet['editDate']; }
-    		else 								{ print _("Never"); }
-    		?>
+    		<?php print $subnet['editDate']; ?>
     		</span>
     	</td>
     </tr>
