@@ -501,6 +501,16 @@ $(".input-switch-danger").bootstrapSwitch(switch_options_danger);
 		# count datepickers
 		$timepicker_index = 0;
 		foreach($custom_fields as $field) {
+			# 跳过 public_ip 字段，不显示
+			if($field['name'] == 'public_ip') {
+				continue;
+			}
+			
+			# 内网地址字段仅在公网子网下显示
+			if($field['name'] == 'internal_ip' && $subnet['isPublic'] != 1) {
+				continue;
+			}
+			
 			$custom_input = $Tools->create_custom_field_input ($field, $address, $timepicker_index);
 			$timepicker_index = $custom_input['timepicker_index'];
 
