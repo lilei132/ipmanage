@@ -141,6 +141,115 @@ $(".input-switch-danger").bootstrapSwitch(switch_options_danger);
 // 已禁用MAC地址验证，现在使用MAC字段存储院系/部门
 <?php } ?>
 
+// 用户信息查询功能
+$('#query_user_btn').click(function() {
+    var employee_id = $('#employee_id').val().trim();
+    
+    if (employee_id === '') {
+        $('#query_result').html('<div class="alert alert-warning alert-sm">工号不能为空</div>');
+        return;
+    }
+    
+    // 显示加载状态
+    $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> 查询中');
+    $('#query_result').html('<div class="alert alert-info alert-sm"><i class="fa fa-spinner fa-spin"></i> 查询中...</div>');
+    
+    // 发送AJAX请求
+    $.ajax({
+        url: 'api/user_query.php',
+        type: 'GET',
+        data: {
+            action: 'query_user',
+            employee_id: employee_id
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                // 自动填充表单
+                $('#user_name').val(response.data.name);
+                $('#user_department').val(response.data.department);
+                
+                // 显示成功信息，区分数据源
+                var source_text = response.source === 'mock' ? '（测试数据）' : '';
+                $('#query_result').html('<div class="alert alert-success alert-sm"><i class="fa fa-check"></i> 已自动填充' + source_text + '</div>');
+                
+                // 2秒后隐藏成功信息
+                setTimeout(function() {
+                    $('#query_result').fadeOut();
+                }, 2000);
+            } else {
+                // 如果API服务异常，提供降级选项
+                if (response.fallback) {
+                    var error_html = '<div class="alert alert-warning alert-sm">';
+                    error_html += '<i class="fa fa-exclamation-triangle"></i> ' + response.error;
+                    error_html += '<br><button type="button" class="btn btn-xs btn-default" id="fallback_query" style="margin-top:5px;">';
+                    error_html += '<i class="fa fa-refresh"></i> 使用测试数据查询</button></div>';
+                    $('#query_result').html(error_html);
+                    
+                    // 绑定降级查询事件
+                    $('#fallback_query').click(function() {
+                        // 使用模拟数据重新查询
+                        queryWithMockData(employee_id);
+                    });
+                } else {
+                    $('#query_result').html('<div class="alert alert-danger alert-sm"><i class="fa fa-times"></i> ' + response.error + '</div>');
+                }
+            }
+        },
+        error: function() {
+            $('#query_result').html('<div class="alert alert-danger alert-sm"><i class="fa fa-times"></i> 查询失败</div>');
+        },
+        complete: function() {
+            // 恢复按钮状态
+            $('#query_user_btn').prop('disabled', false).html('<i class="fa fa-search"></i> 查询');
+        }
+    });
+});
+
+// 回车键触发查询
+$('#employee_id').keypress(function(e) {
+    if (e.which == 13) { // 回车键
+        e.preventDefault();
+        $('#query_user_btn').click();
+    }
+});
+
+// 使用模拟数据查询的函数
+function queryWithMockData(employee_id) {
+    $('#query_result').html('<div class="alert alert-info alert-sm"><i class="fa fa-spinner fa-spin"></i> 使用测试数据查询中...</div>');
+    
+    $.ajax({
+        url: 'api/user_query.php',
+        type: 'GET',
+        data: {
+            action: 'query_user',
+            employee_id: employee_id,
+            use_mock: true
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                // 自动填充表单
+                $('#user_name').val(response.data.name);
+                $('#user_department').val(response.data.department);
+                
+                // 显示成功信息
+                $('#query_result').html('<div class="alert alert-success alert-sm"><i class="fa fa-check"></i> 已自动填充（测试数据）</div>');
+                
+                // 2秒后隐藏成功信息
+                setTimeout(function() {
+                    $('#query_result').fadeOut();
+                }, 2000);
+            } else {
+                $('#query_result').html('<div class="alert alert-danger alert-sm"><i class="fa fa-times"></i> ' + response.error + '</div>');
+            }
+        },
+        error: function() {
+            $('#query_result').html('<div class="alert alert-danger alert-sm"><i class="fa fa-times"></i> 查询失败</div>');
+        }
+    });
+}
+
 });
 </script>
 
@@ -208,7 +317,7 @@ $(".input-switch-danger").bootstrapSwitch(switch_options_danger);
 		print '	<td>'._('申请人姓名').$required.'</td>'. "\n";
 		print '	<td>'. "\n";
 		print '	<div class="input-group">';
-		print ' <input type="text" name="hostname" class="ip_addr form-control input-sm" placeholder="'._('申请人姓名').'" value="'. $address['hostname']. '" '.$delete.'>'. "\n";
+		print ' <input type="text" name="hostname" id="user_name" class="ip_addr form-control input-sm" placeholder="'._('申请人姓名').'" value="'. $address['hostname']. '" '.$delete.'>'. "\n";
 		print '	 <span class="input-group-addon">'."\n";
 		print "		<i class='fa fa-gray fa-user' rel='tooltip' data-placement='right' title='"._('申请人姓名')."'></i></span>";
 		print "	</span>";
@@ -221,15 +330,24 @@ $(".input-switch-danger").bootstrapSwitch(switch_options_danger);
 	<tr>
 		<td>
 			<?php
-			// set star if field is required
-			$required = in_array("description", $required_ip_fields) ? " *" : "";
-			print _('工号').$required;
+			// 工号设为必填项
+			print _('工号').' *';
 			?>
 		</td>
 		<td>
-			<input type="text" name="description" class="ip_addr form-control input-sm" value="<?php if(isset($address['description'])) {print $address['description'];} ?>" size="30"
-			<?php if ( $act == "delete" ) { print " readonly";} ?>
-			placeholder="<?php print _('工号'); ?>">
+			<div class="input-group">
+				<input type="text" name="description" id="employee_id" class="ip_addr form-control input-sm" value="<?php if(isset($address['description'])) {print $address['description'];} ?>" size="30"
+				<?php if ( $act == "delete" ) { print " readonly";} ?>
+				placeholder="<?php print _('工号'); ?>">
+				<span class="input-group-btn">
+					<button type="button" class="btn btn-sm btn-default" id="query_user_btn" 
+					<?php if ( $act == "delete" ) { print " disabled";} ?>
+					title="查询用户信息">
+						<i class="fa fa-search"></i> 查询
+					</button>
+				</span>
+			</div>
+			<div id="query_result" style="margin-top: 5px;"></div>
 		</td>
 	</tr>
 
@@ -253,19 +371,19 @@ $(".input-switch-danger").bootstrapSwitch(switch_options_danger);
 
      		if ($User->is_admin (false)) {
         		print ' <div class="form-group '.$mcast_class.'" style="margin-bottom:0px;">';
-        		print ' <input type="text" name="mac" class="ip_addr form-control input-sm" placeholder="'._('院系/部门').'" value="'. $address['mac']. '" size="30" '.$delete.'>'.$mcast_help_block;
+        		print ' <input type="text" name="mac" id="user_department" class="ip_addr form-control input-sm" placeholder="'._('院系/部门').'" value="'. $address['mac']. '" size="30" '.$delete.'>'.$mcast_help_block;
         		print ' </div>';
     		}
     		else {
          		print ' <div class="form-group '.$mcast_class.'" style="margin-bottom:0px;">';
-        		print ' <input type="text" name="mac" class="ip_addr form-control input-sm" placeholder="'._('院系/部门').'" value="'. $address['mac']. '" size="30" '.$delete.'>'.$mcast_help_block;
+        		print ' <input type="text" name="mac" id="user_department" class="ip_addr form-control input-sm" placeholder="'._('院系/部门').'" value="'. $address['mac']. '" size="30" '.$delete.'>'.$mcast_help_block;
         		print ' <input type="hidden" name="mac" value="'. $address['mac']. '">';
         		print ' </div>';
     		}
 		}
 		else {
         		print ' <div class="form-group" style="margin-bottom:0px;">';
-        		print ' <input type="text" name="mac" class="ip_addr form-control input-sm" placeholder="'._('院系/部门').'" value="'. $address['mac']. '" size="30" '.$delete.'>'. "\n";
+        		print ' <input type="text" name="mac" id="user_department" class="ip_addr form-control input-sm" placeholder="'._('院系/部门').'" value="'. $address['mac']. '" size="30" '.$delete.'>'. "\n";
         		print ' </div>';
 		}
         print '	</td>'. "\n";
