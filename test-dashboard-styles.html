@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>看板样式测试</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .dashboard-grid .dashboard-item {
+            margin-bottom: 20px;
+        }
+
+        .dashboard-card {
+            height: 240px;
+            border: 1px solid #ddd;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .dashboard-card:hover {
+            border-color: #337ab7;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .dashboard-card .panel-body {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .dashboard-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .dashboard-title-area {
+            flex: 1;
+        }
+
+        .dashboard-name {
+            margin: 0;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .card-count-badge {
+            position: relative;
+            top: -2px;
+        }
+
+        .zero-badge .count-number {
+            display: inline-block;
+            font-size: 22px;
+            font-weight: bold;
+            color: #f0ad4e;
+            background-color: rgba(240, 173, 78, 0.1);
+            border: 2px solid #f0ad4e;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            line-height: 28px;
+            text-align: center;
+        }
+
+        .dashboard-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dashboard-description {
+            font-size: 13px;
+            margin-bottom: 15px;
+            height: 40px;
+            overflow: hidden;
+            color: #666;
+        }
+
+        .dashboard-stats {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+            padding: 10px 0;
+            border-top: 1px solid #eee;
+            margin-top: auto;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            display: block;
+            font-size: 18px;
+            font-weight: bold;
+            color: #337ab7;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        .dashboard-card.empty-dashboard {
+            border: 2px dashed #f0ad4e;
+            background-color: rgba(240, 173, 78, 0.05);
+        }
+
+        .dashboard-card.empty-dashboard:hover {
+            border-color: #ec971f;
+            background-color: rgba(240, 173, 78, 0.1);
+        }
+
+        .dashboard-actions {
+            text-align: center;
+            margin-top: auto;
+            padding-top: 10px;
+        }
+
+        .dashboard-actions .btn {
+            margin: 0 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="dashboard-header">
+            <h4><i class="fa fa-dashboard"></i> 流量监控看板样式测试</h4>
+            <p class="text-muted">测试新的看板样式显示效果</p>
+        </div>
+        
+        <div class="row dashboard-grid">
+            <!-- 有监控卡片的正常看板 -->
+            <div class="col-lg-4 col-md-6 col-sm-12 dashboard-item">
+                <div class="panel panel-default dashboard-card">
+                    <div class="panel-body">
+                        <div class="dashboard-header-row">
+                            <div class="dashboard-title-area">
+                                <h5 class="dashboard-name">
+                                    <i class="fa fa-dashboard text-primary"></i>
+                                    核心出口端口
+                                </h5>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-content">
+                            <p class="dashboard-description text-muted">
+                                监控校园网出口端口流量，包括运营商线路和专线
+                            </p>
+                            
+                            <div class="dashboard-stats">
+                                <div class="stat-item">
+                                    <span class="stat-number">3</span>
+                                    <span class="stat-label">监控卡片</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-actions">
+                            <button class="btn btn-primary btn-sm">
+                                <i class="fa fa-eye"></i> 查看看板
+                            </button>
+                            <button class="btn btn-default btn-sm">
+                                <i class="fa fa-edit"></i> 编辑
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 0监控卡片的看板 - 新样式 -->
+            <div class="col-lg-4 col-md-6 col-sm-12 dashboard-item">
+                <div class="panel panel-default dashboard-card empty-dashboard">
+                    <div class="panel-body">
+                        <div class="dashboard-header-row">
+                            <div class="dashboard-title-area">
+                                <h5 class="dashboard-name">
+                                    <i class="fa fa-dashboard text-primary"></i>
+                                    服务器区域
+                                </h5>
+                            </div>
+                            <div class="card-count-badge zero-badge">
+                                <span class="count-number">0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-content">
+                            <p class="dashboard-description text-muted">
+                                监控重要服务器的网络流量
+                            </p>
+                        </div>
+                        
+                        <div class="dashboard-actions">
+                            <button class="btn btn-primary btn-sm">
+                                <i class="fa fa-eye"></i> 查看看板
+                            </button>
+                            <button class="btn btn-default btn-sm">
+                                <i class="fa fa-edit"></i> 编辑
+                            </button>
+                            <button class="btn btn-danger btn-sm">
+                                <i class="fa fa-trash"></i> 删除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 另一个0监控卡片的看板 -->
+            <div class="col-lg-4 col-md-6 col-sm-12 dashboard-item">
+                <div class="panel panel-default dashboard-card empty-dashboard">
+                    <div class="panel-body">
+                        <div class="dashboard-header-row">
+                            <div class="dashboard-title-area">
+                                <h5 class="dashboard-name">
+                                    <i class="fa fa-dashboard text-primary"></i>
+                                    无线网络
+                                </h5>
+                            </div>
+                            <div class="card-count-badge zero-badge">
+                                <span class="count-number">0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-content">
+                            <p class="dashboard-description text-muted">
+                                监控无线接入点和控制器的流量状况
+                            </p>
+                        </div>
+                        
+                        <div class="dashboard-actions">
+                            <button class="btn btn-primary btn-sm">
+                                <i class="fa fa-eye"></i> 查看看板
+                            </button>
+                            <button class="btn btn-default btn-sm">
+                                <i class="fa fa-edit"></i> 编辑
+                            </button>
+                            <button class="btn btn-danger btn-sm">
+                                <i class="fa fa-trash"></i> 删除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

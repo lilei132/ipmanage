@@ -702,7 +702,7 @@ class Traffic extends Common_functions {
     public function get_device_interfaces($device_id) {
         try {
             $start_time = microtime(true);
-            
+
             // 极简查询：直接获取去重的接口信息，限制记录数
             $query = "SELECT DISTINCT 
                         if_index,
@@ -729,8 +729,8 @@ class Traffic extends Common_functions {
                 if (empty($interfaces)) {
                     error_log("No recent interfaces found, trying broader search for device: " . $device_id);
                     return $this->get_device_interfaces_fallback($device_id);
-                }
-
+                            }
+                            
                 error_log("Found " . count($interfaces) . " interfaces for device: " . $device_id);
                 return $interfaces;
             }

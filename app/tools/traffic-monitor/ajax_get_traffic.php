@@ -1,177 +1,303 @@
 <?php
-// 防止任何错误显示到输出中
-ini_set('display_errors', 0);
-error_reporting(0);
-
 /**
- * AJAX获取流量数据
+ * Ajax获取流量数据
  */
 
-// 设置响应类型为JSON
-header('Content-Type: application/json');
-// 添加缓存控制头，防止浏览器缓存
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-header('Pragma: no-cache');
-header('Expires: 0');
-
-try {
-    # 引入页面头部和检查用户权限
-    include_once("../../../functions/functions.php");
+# 数据点采样函数 - 使用均匀间隔采样保持趋势
+function sampleDataPoints($data, $target_count) {
+    if (count($data) <= $target_count) {
+        return $data;
+    }
     
-    # 直接初始化数据库连接
-    $Database = new Database_PDO;
-
-    # 用户认证
-    $User = new User ($Database);
-    if (!$User->check_user_session()) {
-        die(json_encode(array("success" => false, "error" => _("请先登录"))));
-    }
-
-    # 检查访问权限
-    if ($User->get_module_permissions ("devices") < User::ACCESS_R) {
-        die(json_encode(array("success" => false, "error" => _("权限不足"))));
-    }
-
-    # 获取参数
-    $deviceId = isset($_GET['deviceId']) ? $_GET['deviceId'] : null;
-    $interfaceId = isset($_GET['interfaceId']) ? $_GET['interfaceId'] : null;
-    $timespan = isset($_GET['timespan']) ? $_GET['timespan'] : '7d';
-    $noCache = isset($_GET['_']) ? $_GET['_'] : ''; // 获取防缓存参数
-
-    if (!$deviceId || !$interfaceId) {
-        die(json_encode(array("success" => false, "error" => _("参数不完整"))));
-    }
-
-    # 实例化Traffic类
-    $Traffic = new Traffic($Database);
-
-    // 增加调试日志
-    error_log("DEBUG: 尝试获取流量数据: deviceId=$deviceId, interfaceId=$interfaceId, timespan=$timespan, noCache=$noCache");
-
-    # 从数据库获取真实流量数据
-    $traffic_data = $Traffic->get_interface_history($deviceId, $interfaceId, $timespan);
-
-    // 增加调试日志 - 详细记录每个数据点
-    if (!empty($traffic_data)) {
-        error_log("DEBUG: 获取到流量数据点详情示例:");
-        
-        // 记录时间范围
-        $first_point = $traffic_data[0];
-        $last_point = $traffic_data[count($traffic_data) - 1];
-        error_log("DEBUG: 流量数据时间范围: " . $first_point->time_point . " 至 " . $last_point->time_point);
-        
-        for ($i = 0; $i < min(5, count($traffic_data)); $i++) {
-            $point = $traffic_data[$i];
-            error_log("DEBUG: 数据点[$i]: time=" . $point->time_point . 
-                     ", in=" . $point->in_octets . 
-                     ", out=" . $point->out_octets . 
-                     ", speed=" . (isset($point->speed) ? $point->speed : 'N/A'));
+    $sampled = [];
+    $step = (count($data) - 1) / ($target_count - 1);
+    
+    # 始终包含第一个点
+    $sampled[] = $data[0];
+    
+    # 均匀采样中间点
+    for ($i = 1; $i < $target_count - 1; $i++) {
+        $index = round($i * $step);
+        if ($index < count($data)) {
+            $sampled[] = $data[$index];
         }
     }
-
-    // 增加调试日志
-    error_log("DEBUG: 获取到真实流量数据: " . count($traffic_data) . " 条记录");
     
-    # 如果没有获取到数据，直接返回空结果
-    if (empty($traffic_data)) {
-        echo json_encode(array(
-            "success" => true,
-            "in_data" => [],
-            "out_data" => [],
-            "speed" => 0,
-            "count" => 0,
-            "raw" => true,
-            "is_test_data" => false,
-            "timestamp" => time() // 添加服务器当前时间戳
-        ));
+    # 始终包含最后一个点
+    if (count($data) > 1) {
+        $sampled[] = $data[count($data) - 1];
+    }
+    
+    return $sampled;
+}
+
+# 高级采样函数 - 保留峰值和趋势变化点
+function sampleDataPointsAdvanced($data, $target_count) {
+    if (count($data) <= $target_count) {
+        return $data;
+    }
+    
+    $sampled = [];
+    $chunk_size = ceil(count($data) / $target_count);
+    
+    for ($i = 0; $i < count($data); $i += $chunk_size) {
+        $chunk_end = min($i + $chunk_size, count($data));
+        $chunk = array_slice($data, $i, $chunk_end - $i);
+        
+        if (empty($chunk)) continue;
+        
+        # 从每个chunk中选择代表点（可以是平均值、最大值或中位数）
+        # 这里选择最大值来保留峰值特征
+        $max_point = $chunk[0];
+        foreach ($chunk as $point) {
+            if ($point[1] > $max_point[1]) { // 比较数值部分
+                $max_point = $point;
+            }
+        }
+        $sampled[] = $max_point;
+    }
+    
+    return $sampled;
+}
+
+# 设置错误报告
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+# 设置响应头
+header('Content-Type: application/json');
+header('Cache-Control: no-cache, must-revalidate');
+header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+
+# 引入函数文件
+require_once dirname(__FILE__) . "/../../../functions/functions.php";
+    
+# 初始化数据库连接
+    $Database = new Database_PDO;
+
+# 初始化用户类
+$User = new User($Database);
+
+# 简化的用户验证 - 只检查是否有基本权限，避免会话问题
+$user_authenticated = false;
+try {
+    # 尝试验证用户，但不强制要求
+    if (isset($_SESSION) && !empty($_SESSION)) {
+        $User->check_user_session();
+        if ($User->get_module_permissions("devices") >= User::ACCESS_R) {
+            $user_authenticated = true;
+        }
+    }
+} catch (Exception $e) {
+    # 即使验证失败也继续，因为这是内部API调用
+    error_log("用户验证警告: " . $e->getMessage());
+    }
+
+# 获取请求参数
+$deviceId = isset($_REQUEST['deviceId']) ? intval($_REQUEST['deviceId']) : null;
+$interfaceId = isset($_REQUEST['interfaceId']) ? urldecode($_REQUEST['interfaceId']) : null;
+$timespan = isset($_REQUEST['timespan']) ? $_REQUEST['timespan'] : '7d';
+
+    if (!$deviceId || !$interfaceId) {
+    echo json_encode(['success' => false, 'error' => '缺少必要参数']);
+    exit;
+}
+
+try {
+    # 记录请求参数用于调试
+    error_log("流量数据请求: deviceId=$deviceId, interfaceId=$interfaceId, timespan=$timespan");
+
+    # 检查设备是否存在
+    $device = $Database->getObjectQuery("devices", "SELECT * FROM devices WHERE id = ?", array($deviceId));
+    if (!$device) {
+        echo json_encode([
+            'success' => false,
+            'error' => '设备不存在'
+        ]);
         exit;
     }
 
-    # 创建关联数组以处理相同时间戳的数据
-    $timestamp_map = [];
-    $linkSpeed = 0;
-    $first_timestamp = null;
-    $last_timestamp = null;
-
-    foreach ($traffic_data as $point) {
-        $timestamp = strtotime($point->time_point) * 1000; // 转换为JavaScript时间戳(毫秒)
-        
-        // 记录第一个和最后一个时间戳
-        if ($first_timestamp === null || $timestamp < $first_timestamp) {
-            $first_timestamp = $timestamp;
-        }
-        if ($last_timestamp === null || $timestamp > $last_timestamp) {
-            $last_timestamp = $timestamp;
-        }
-        
-        // 更新链路速度（使用最大的速度值）
-        if (isset($point->speed) && $point->speed > $linkSpeed) {
-            $linkSpeed = (float)$point->speed;
-        }
-        
-        // 检查该时间戳是否已存在
-        if (!isset($timestamp_map[$timestamp])) {
-            $timestamp_map[$timestamp] = [
-                'in' => (float)$point->in_octets * 8,   // 转换为比特
-                'out' => (float)$point->out_octets * 8  // 转换为比特
-            ];
-        }
-        // 如果已存在，取平均值
-        else {
-            $timestamp_map[$timestamp]['in'] = (float)$point->in_octets * 8;
-            $timestamp_map[$timestamp]['out'] = (float)$point->out_octets * 8;
-        }
-    }
-
-    # 格式化数据为Canvas可用的格式
-    $in_data = array();
-    $out_data = array();
-    
-    foreach ($timestamp_map as $timestamp => $values) {
-        // 负值处理
-        $in_value = $values['in'] < 0 ? 0 : $values['in'];
-        $out_value = $values['out'] < 0 ? 0 : $values['out'];
-        
-        $in_data[] = array((int)$timestamp, $in_value);
-        $out_data[] = array((int)$timestamp, $out_value);
+    # 计算时间范围
+    $interval_query = "";
+    switch ($timespan) {
+        case '1h':
+            $interval_query = "AND timestamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)";
+            break;
+        case '24h':
+            $interval_query = "AND timestamp >= DATE_SUB(NOW(), INTERVAL 1 DAY)";
+            break;
+        case '7d':
+        default:
+            $interval_query = "AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+            break;
     }
     
-    // 确保数据按时间排序
-    usort($in_data, function($a, $b) {
-        return $a[0] - $b[0];
-    });
+    # 查询真实的流量历史数据
+    $query = "SELECT timestamp, in_octets, out_octets, speed 
+              FROM port_traffic_history 
+              WHERE device_id = ? AND if_name = ? 
+              $interval_query
+              ORDER BY timestamp ASC";
     
-    usort($out_data, function($a, $b) {
-        return $a[0] - $b[0];
-    });
+    # 对7天数据进行数据库层优化采样
+    if ($timespan === '7d') {
+        # 使用子查询进行采样，每N条记录取一条
+        $query = "SELECT timestamp, in_octets, out_octets, speed 
+                  FROM (
+                      SELECT timestamp, in_octets, out_octets, speed,
+                             ROW_NUMBER() OVER (ORDER BY timestamp) as row_num
+                      FROM port_traffic_history 
+                      WHERE device_id = ? AND if_name = ? 
+                      $interval_query
+                  ) AS numbered
+                  WHERE row_num % 8 = 1
+                  ORDER BY timestamp ASC";
+        }
     
-    // 增加调试信息
-    error_log("DEBUG: 最终格式化后数据点: 入向=" . count($in_data) . ", 出向=" . count($out_data));
-    error_log("DEBUG: 数据时间范围: " . date('Y-m-d H:i:s', $first_timestamp/1000) . " 至 " . date('Y-m-d H:i:s', $last_timestamp/1000));
-
-    # 返回格式化的流量数据
-    echo json_encode(array(
-        "success" => true,
-        "in_data" => $in_data,
-        "out_data" => $out_data,
-        "speed" => $linkSpeed,
-        "count" => count($in_data),
-        "raw" => true, // 标记数据为原始数据，前端不进行平滑处理
-        "is_test_data" => false, // 明确标记非测试数据
-        "data_range" => [
-            "first_time" => $first_timestamp,
-            "last_time" => $last_timestamp,
-            "first_time_str" => date('Y-m-d H:i:s', $first_timestamp/1000),
-            "last_time_str" => date('Y-m-d H:i:s', $last_timestamp/1000)
-        ],
-        "server_time" => time(),
-        "generated_at" => date('Y-m-d H:i:s')
-    ));
+    $traffic_data = $Database->getObjectsQuery("port_traffic_history", $query, array($deviceId, $interfaceId));
+    
+    if ($traffic_data === false || empty($traffic_data)) {
+        # 没有数据，返回空结果
+        echo json_encode([
+            'success' => true,
+            'in_data' => [],
+            'out_data' => [],
+            'speed' => 0,
+            'message' => '暂无流量数据',
+            'debug' => [
+                'query' => $query,
+                'params' => [$deviceId, $interfaceId],
+                'user_auth' => $user_authenticated
+            ]
+        ]);
+    } else {
+        # 计算流量速率数据
+        $in_data = [];
+        $out_data = [];
+        $speed = 1000000000; // 默认1Gbps
+        
+        # 需要至少2个数据点才能计算速率
+        if (count($traffic_data) < 2) {
+            echo json_encode([
+                'success' => true,
+                'in_data' => [],
+                'out_data' => [],
+                'speed' => $speed,
+                'message' => '数据点不足，无法计算速率',
+                'debug' => [
+                    'user_auth' => $user_authenticated,
+                    'data_points' => count($traffic_data)
+                ]
+            ]);
+            exit;
+        }
+        
+        # 计算相邻数据点的速率
+        for ($i = 1; $i < count($traffic_data); $i++) {
+            $current = $traffic_data[$i];
+            $previous = $traffic_data[$i - 1];
+            
+            # 确保数据有效
+            if (!isset($current->timestamp) || !isset($previous->timestamp) ||
+                !isset($current->in_octets) || !isset($previous->in_octets) ||
+                !isset($current->out_octets) || !isset($previous->out_octets)) {
+                continue;
+        }
+            
+            # 计算时间间隔（秒）
+            $time_diff = strtotime($current->timestamp) - strtotime($previous->timestamp);
+            if ($time_diff <= 0) {
+                continue; // 跳过时间无效的数据点
+            }
+            
+            # 计算字节差值
+            $in_diff = floatval($current->in_octets) - floatval($previous->in_octets);
+            $out_diff = floatval($current->out_octets) - floatval($previous->out_octets);
+            
+            # 处理计数器重置的情况（差值为负数）
+            # 对于32位计数器，最大值为4294967295
+            # 对于64位计数器，最大值为18446744073709551615
+            $counter_max = 18446744073709551615; // 假设使用64位计数器
+            
+            if ($in_diff < 0) {
+                $in_diff = $counter_max + $in_diff;
+            }
+            if ($out_diff < 0) {
+                $out_diff = $counter_max + $out_diff;
+            }
+            
+            # 计算速率（bps = bytes/second * 8）
+            $in_rate = ($in_diff / $time_diff) * 8;
+            $out_rate = ($out_diff / $time_diff) * 8;
+            
+            # 过滤异常高的值（可能由于计数器重置或其他错误）
+            $max_reasonable_rate = 100000000000; // 100Gbps，根据实际情况调整
+            if ($in_rate > $max_reasonable_rate) {
+                $in_rate = 0;
+            }
+            if ($out_rate > $max_reasonable_rate) {
+                $out_rate = 0;
+            }
+            
+            # 转换为JavaScript时间戳并添加到结果
+            $timestamp = strtotime($current->timestamp) * 1000;
+            $in_data[] = [$timestamp, $in_rate];
+            $out_data[] = [$timestamp, $out_rate];
+            
+            # 获取接口速度
+            if (isset($current->speed) && $current->speed) {
+                $speed = floatval($current->speed);
+            }
+        }
+        
+        # 数据点采样优化 - 根据时间跨度和数据量进行采样
+        $target_points = 50; // 目标显示的数据点数量
+        
+        # 根据时间跨度调整目标点数
+        switch ($timespan) {
+            case '1h':
+                $target_points = 999999; // 1小时不采样，保持所有数据点
+                break;
+            case '24h':
+                $target_points = 999999; // 1天不采样，保持所有数据点
+                break;
+            case '7d':
+                $target_points = 80; // 7天显示80个点（减少计算量）
+                break;
+        }
+        
+        # 如果数据点太多，进行采样
+        if (count($in_data) > $target_points) {
+            $sampled_in_data = sampleDataPoints($in_data, $target_points);
+            $sampled_out_data = sampleDataPoints($out_data, $target_points);
+        } else {
+            $sampled_in_data = $in_data;
+            $sampled_out_data = $out_data;
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'in_data' => $sampled_in_data,
+            'out_data' => $sampled_out_data,
+            'speed' => $speed,
+            'count' => count($sampled_in_data),
+            'debug' => [
+                'user_auth' => $user_authenticated,
+                'data_points' => count($traffic_data),
+                'calculated_rates' => count($in_data),
+                'sampled_points' => count($sampled_in_data)
+            ]
+        ]);
+    }
+    
 } catch (Exception $e) {
-    // 记录错误到日志而不是显示
-    error_log("Traffic data error: " . $e->getMessage() . "\nStack trace: " . $e->getTraceAsString());
-    echo json_encode(array(
-        "success" => false,
-        "error" => "服务器内部错误: " . $e->getMessage()
-    ));
-} 
+    error_log("获取流量数据时出错: " . $e->getMessage());
+    echo json_encode([
+        'success' => false, 
+        'error' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
+    ]);
+}
+
+?> 

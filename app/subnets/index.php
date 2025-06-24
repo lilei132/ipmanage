@@ -171,8 +171,8 @@ if ($User->settings->enableNAT==1) {
 				$addresses = $Addresses->fetch_subnet_addresses ($subnet['id']);
 			}
 			include('addresses/print-address-table.php');
-		}
-		?>
+	}
+	?>
 	</div>
 
 	<!-- orphaned addresses -->

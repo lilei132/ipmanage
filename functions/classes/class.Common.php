@@ -1706,7 +1706,7 @@ class Common_functions  {
             $html[] = '<input type="text" class="form-control input-sm" name="'. $field['nameNew'].$nameSuffix .'" placeholder="请输入内网地址 (例如: 192.168.1.100)" value="'. $object->{$field['name']}. '" rel="tooltip" data-placement="right" maxlength="'.$maxlength.'" title="'.$field['Comment'].'" '.$disabled_text.'>';
         } else {
             // Default input field for other custom fields
-            $html[] = ' <input type="text" class="form-control input-sm" name="'. $field['nameNew'].$nameSuffix .'" placeholder="'. $this->print_custom_field_name ($field['name']) .'" value="'. $object->{$field['name']}. '" size="30" rel="tooltip" data-placement="right" maxlength="'.$maxlength.'" title="'.$field['Comment'].'" '.$disabled_text.'>'. "\n";
+		$html[] = ' <input type="text" class="form-control input-sm" name="'. $field['nameNew'].$nameSuffix .'" placeholder="'. $this->print_custom_field_name ($field['name']) .'" value="'. $object->{$field['name']}. '" size="30" rel="tooltip" data-placement="right" maxlength="'.$maxlength.'" title="'.$field['Comment'].'" '.$disabled_text.'>'. "\n";
         }
         
     	// result

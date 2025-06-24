@@ -131,6 +131,7 @@ if($User->settings->enableCircuits == 1 && $User->get_module_permissions ("circu
 $tools_menu[_('Devices')][] =   ["show"=>true, "icon"=>"fa-random",      "href"=>"circuits",                    "name"=>_("Circuits"),             "description"=>_("Circuit information")];
 if($User->settings->enableLocations == 1 && $User->get_module_permissions ("locations")>=User::ACCESS_R)
 $tools_menu[_('Devices')][] =   ["show"=>true, "icon"=>"fa-map",         "href"=>"locations",                   "name"=>_("Locations"),            "description"=>_("Locations")];
+if($User->get_module_permissions ("devices")>=1)
 $tools_menu[_('Devices')][] =   ["show"=>true, "icon"=>"fa-chart-line",  "href"=>"traffic-monitor",             "name"=>_("流量监控"),           "description"=>_("设备端口流量监控")];
 
 # user menu
