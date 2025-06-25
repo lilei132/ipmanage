@@ -1,86 +1,106 @@
-# {php}IPAM
-Website: https://phpipam.net/
+# IPAM 网络地址管理系统
 
-## Description
-phpIPAM is 2025 6.9 an open-source web IP address management application. Its goal is to provide light and simple IP address management application.
-It is ajax-based using jQuery libraries, it uses php scripts and javascript and some HTML5/CSS3 features, so some modern browser is preferred
-to be able to display javascript quickly and correctly.
+南京信息工程大学定制版本 - 现代化UI + 工号查询功能
 
-## Links
- - [Features & Tools](https://phpipam.net/documents/features/)
- - [Requirements & Installation](https://phpipam.net/documents/installation/)
- - [API guide](https://phpipam.net/api-documentation/)
- - [Update](https://phpipam.net/documents/upgrade/)
- - [Demo page](http://demo.phpipam.net) (Login: `Admin / ipamadmin`)
+## 系统特色
 
-## Branches
- - MASTER: Latest stable release
- - DEVELOP: Current development branch
- - 1.7: Maintenance branch for 1.7.x releases
- - 1.6: Maintenance branch for 1.6.x releases (obsolete)
- - 1.5: Maintenance branch for 1.5.x releases (obsolete)
- - 1.4: Maintenance branch for 1.4.x releases (obsolete)
- - 1.3: Maintenance branch for 1.3.x releases (obsolete)
- - 1.2: Maintenance branch for 1.2.x releases (obsolete)
- - Other branches: Feature testing
+### 🎨 现代化UI设计
+- **南信大主题色彩**：采用南信大标准蓝色(#003A5A)作为主色调
+- **Material Design风格**：现代化的卡片布局、阴影效果和圆角设计
+- **响应式设计**：完美支持桌面和移动设备
+- **优化的对比度**：确保所有文字和界面元素都有良好的可读性
+- **统一的组件样式**：按钮、表格、表单等所有UI组件都经过精心设计
 
-## Supported PHP versions
+### 🔍 智能工号查询
+- **自动填充功能**：输入工号后自动查询并填充姓名和院系信息
+- **多数据源支持**：优先使用南信大数据中台API，支持降级到测试数据
+- **友好的用户体验**：实时反馈查询状态，支持回车键快速查询
+- **错误处理机制**：完善的错误提示和重试机制
 
-phpIPAM has been developed and tested on the following PHP versions.\
-The use of untested PHP versions is unsupported and may result in compatibility issues.
+### 📊 流量监控系统
+- **实时流量监控**：支持设备接口流量的实时监控和可视化
+- **灵活的时间范围**：支持多种时间跨度的流量数据查询
+- **图表展示**：直观的流量趋势图表显示
+- **仪表板集成**：主仪表板支持流量监控小部件
 
-- MASTER: See latest 1.x.y release version
-- DEVELOP: PHP versions 7.2 to 8.4
-- 1.7.x: PHP versions 7.2 to 8.3
-- 1.6.x: PHP versions 7.2 to 8.3
-- 1.5.x: PHP versions 5.4 to 7.4
-- 1.4.x: PHP versions 5.4 to 7.4
-- 1.3.x: PHP versions 5.4 to 7.1
+## 技术架构
 
-## Supported MySQL / MariaDB versions
+- **后端**：PHP 7.4+ + MySQL/MariaDB
+- **前端**：Bootstrap 3 + jQuery + Chart.js
+- **样式**：CSS变量系统 + 现代化组件库
+- **API集成**：南信大数据中台API
 
-Common Table Expressions (CTE) query support highly recommended : MySQL 8.0+ / MariaDB 10.2.1+ \
-As of v1.6.0 support for utf8mb4 is mandatory: MySQL 5.7.7+
+## 核心功能
 
-## I forgot my Admin password!?
-Just run `php functions/scripts/reset-admin-password.php` in the cli and enter your new password
+### IP地址管理
+- ✅ IP地址分配和管理
+- ✅ 子网规划和层级管理
+- ✅ VLID和网络区域管理
+- ✅ **工号查询自动填充**（新增）
 
-## Reverse-Proxy (Infinite login loops)
-As of v1.6.0 when deployed behind a reverse-proxy, set config.php `$trust_x_forwarded_headers = true;` or Docker image environment variable `IPAM_TRUST_X_FORWARDED=true` to accept HTTP X_FORWARDED_ headers.
+### 用户和权限
+- ✅ 多级用户权限管理
+- ✅ LDAP/AD集成
+- ✅ 操作日志记录
 
-**WARNING!** The following HTTP headers shoud be filtered and/or overwritten by the reverse-proxy to avoid potential abuse by end-clients.
+### 设备管理
+- ✅ 网络设备管理
+- ✅ SNMP设备监控
+- ✅ **流量监控系统**（增强）
 
-- X_FORWARDED_FOR
-- X_FORWARDED_HOST
-- X_FORWARDED_PORT
-- X_FORWARDED_PROTO
-- X_FORWARDED_SSL
-- X_FORWARDED_URI
+### 工具集
+- ✅ IP地址扫描
+- ✅ 子网计算器
+- ✅ MAC地址查询
+- ✅ DNS管理工具
 
-## What are the credentials for a fresh install?
-The Default credentials for a new instance of phpIPAM are the same as the credentials for
-the demo page: `Admin / ipamadmin`
+## 安装和配置
 
-## Docker
-Community maintained docker images are available at https://hub.docker.com/u/phpipam
+### 系统要求
+- PHP 7.4 或更高版本
+- MySQL 5.6 或 MariaDB 10.0 或更高版本
+- Apache/Nginx Web服务器
+- PHP扩展：pdo_mysql, gd, curl, mbstring
 
-## Changelog
-See [misc/CHANGELOG](misc/CHANGELOG)
+### 安装步骤
+1. 克隆代码到Web目录
+2. 复制 `config.dist.php` 为 `config.php` 并配置数据库
+3. 导入数据库结构和初始数据
+4. 配置Web服务器虚拟主机
+5. 访问系统进行初始化设置
 
-## Roadmap
-See [misc/Roadmap](misc/Roadmap)
+### 工号查询配置
+在 `api/user_query.php` 中配置数据中台API参数：
+```php
+define('DATACENTER_BASE_URL', 'https://dcm.nuist.edu.cn');
+define('DATACENTER_KEY', 'your_api_key');
+define('DATACENTER_SECRET', 'your_api_secret');
+```
 
-## Security
+## 版本信息
 
-See [SECURITY.md](SECURITY.md)
+### v2.1 (当前版本)
+- ✨ 全新现代化UI设计
+- ✨ 南信大主题色彩定制
+- ✨ 工号查询自动填充功能
+- ✨ 流量监控系统优化
+- 🔧 导航栏高度优化
+- 🔧 下拉菜单样式修复
+- 🔧 弹窗文字对比度优化
+- 🔧 移除版本检查功能
+- 🧹 代码清理和性能优化
 
-## Contact
-miha.petkovsek@gmail.com
+### 界面优化亮点
+- **导航栏**：更紧凑的48px高度设计，移动端44px
+- **卡片系统**：统一的白色卡片配灰色页面背景，增强视觉层次
+- **按钮样式**：现代化的圆角按钮，统一的南信大蓝色主题
+- **表格优化**：更好的行间距、悬停效果和数据展示
+- **响应式布局**：完美适配各种屏幕尺寸
 
-Special thanks are going also to the Hosterdam team (http://www.hosterdam.com) for the VPS server
-that is used for development of phpIPAM and for demo site.
+## 许可证
 
-And also to all users that filed a bug report / feature report and helped with feature testing!
+基于 GPL v3 许可证开源
 
-## License
-phpIPAM is released under the GPL v3 license, see [misc/gpl-3.0.txt](misc/gpl-3.0.txt).
+## 技术支持
+
+如有问题请联系系统管理员或提交Issue。

@@ -803,55 +803,7 @@ table#subnetsMenu td#subnetsLeft .menu-tools {
 	background: #d9534f;
 	color: white;
 }
-#menu-navbar ul li.dropdown.open li a,
-#menu-navbar ul li.dropdown.open.administration li a {
-	color: #ccc;
-}
-#menu-navbar ul li ul,
-#menu-navbar ul li ul a {
-	background: #40454a !important;
-	font-size: 13px;
-}
-#menu-navbar ul li ul li {
-	margin: 0px !important;
-	border-radius: 0px;
-}
-#menu-navbar ul li ul li.active a {
-	background: #222 !important;
-}
-#menu-navbar ul li ul li.nav-header,
-#menu-navbar ul.icon-ul li ul li.nav-header {
-	color: white;
-	padding-left: 10px;
-	white-space: nowrap;
-	padding-bottom: 5px;
-
-	background: transparent;
-
-	padding-top: 15px;
-	padding-bottom: 5px;
-}
-#menu-navbar ul li ul li.nav-header:hover {
-	background: transparent !important;
-}
-/* admin color */
-.navbar#menu-navbar li a.btn-danger,
-.navbar#menu-navbar li ul.admin li:hover {
-	background: #d9534f;
-	border-color: #d43f3a;
-}
-.navbar#menu-navbar li a.btn-success {
-	border-color: #d43f3a;
-}
-#menu-navbar ul li ul.dropdown-menu li a {
-	color: #ccc;
-}
-#menu-navbar ul li ul.dropdown-menu li:hover a,
-#menu-navbar ul li.dropdown.open.administration li a:hover {
-	background-color: #585e65 !important;
-/* 	color: #555; */
-	color: white;
-}
+/* 删除深色样式，由现代化CSS接管 */
 .navbar-default .navbar-toggle .icon-bar {
 	background-color: white;
 }

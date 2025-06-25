@@ -102,12 +102,14 @@ else {
 		<?php if ($User->user->ui_theme!="white") { ?>
 		<link rel="stylesheet" type="text/css" href="css/bootstrap/bootstrap-custom-<?php print $User->user->ui_theme; ?>.css?v=<?php print SCRIPT_PREFIX; ?>">
 		<?php } ?>
+		<!-- 现代化样式 -->
+		<link rel="stylesheet" type="text/css" href="css/modern-ipam.css?v=<?php print SCRIPT_PREFIX; ?>">
 
 		<?php if ($User->settings->enableThreshold=="1") { ?>
 		<link rel="stylesheet" type="text/css" href="css/slider.css?v=<?php print SCRIPT_PREFIX; ?>">
 		<?php } ?>
 
-		<!-- 自定义样式，用于补偿移除header后的页面布局 -->
+		<!-- 页面布局调整 -->
 		<style type="text/css">
 		.content {
 			margin-top: 0px;
@@ -123,6 +125,127 @@ else {
 		.navbar-brand {
 			font-size: 18px;
 			font-weight: bold;
+		}
+		}
+		
+		/* 弹窗文字对比度强化 */
+		.popup,
+		.modal-content {
+			color: #1a1a1a !important;  /* 弹窗主文字颜色 */
+		}
+		
+		.popup .pHeader,
+		.popup .pHeader h4,
+		.modal-header h4,
+		.modal-title {
+			color: #000000 !important;  /* 弹窗标题纯黑 */
+			font-weight: 600 !important;
+		}
+		
+		.popup .pContent label,
+		.popup .pContent th,
+		.modal-body label {
+			color: #000000 !important;  /* 标签纯黑 */
+			font-weight: 500 !important;
+		}
+		
+		.popup .pContent,
+		.modal-body {
+			color: #1a1a1a !important;  /* 内容文字深色 */
+		}
+		
+		.popup .form-control,
+		.modal-body .form-control {
+			color: #1a1a1a !important;  /* 输入框文字深色 */
+		}
+		
+		.popup .help-block,
+		.popup small,
+		.popup .text-muted,
+		.modal-body .help-block,
+		.modal-body small,
+		.modal-body .text-muted {
+			color: #4a4a4a !important;  /* 帮助文字 */
+		}
+		
+		/* 修复下拉菜单样式 - 白色背景黑色文字 */
+		.navbar#menu-navbar .dropdown-menu,
+		#menu-navbar ul li ul {
+			background: #FFFFFF !important;
+			border: none !important;
+			border-radius: 6px !important;
+			box-shadow: 0 4px 12px rgba(60,64,67,0.12) !important;
+			margin-top: 0px !important;  /* 消除空隙 */
+			border-top: 2px solid transparent !important;  /* 增加不可见边框作为缓冲区 */
+		}
+		
+		/* 为下拉菜单父级添加扩展的悬停区域 */
+		.navbar#menu-navbar .dropdown:hover .dropdown-menu,
+		#menu-navbar ul li.dropdown:hover ul {
+			display: block !important;
+		}
+		
+		/* 扩展悬停区域到下拉菜单 */
+		.navbar#menu-navbar .dropdown-menu::before,
+		#menu-navbar ul li ul::before {
+			content: '';
+			position: absolute;
+			top: -10px;
+			left: 0;
+			right: 0;
+			height: 10px;
+			background: transparent;
+		}
+		
+		.navbar#menu-navbar .dropdown-menu li a,
+		#menu-navbar ul li ul li a {
+			color: #000000 !important;  /* 纯黑色提高对比度 */
+			background-color: transparent !important;
+			padding: 12px 20px !important;
+			font-size: 13px !important;
+			font-weight: 500 !important;  /* 稍微加粗提高可读性 */
+		}
+		
+		.navbar#menu-navbar .dropdown-menu li a:hover,
+		#menu-navbar ul li ul li a:hover {
+			background-color: #003A5A !important;  /* 使用原来的主蓝色 */
+			color: white !important;
+		}
+		
+		.navbar#menu-navbar .dropdown-menu li.nav-header,
+		#menu-navbar ul li ul li.nav-header {
+			color: #000000 !important;  /* 导航头也使用纯黑色 */
+			background-color: #f5f5f5 !important;
+			font-weight: 600 !important;
+			padding: 8px 20px !important;
+			margin: 0 !important;
+		}
+		
+		.navbar#menu-navbar .dropdown-menu li.nav-header:hover,
+		#menu-navbar ul li ul li.nav-header:hover {
+			background-color: #f5f5f5 !important;
+			color: #000000 !important;  /* 悬停时也保持纯黑色 */
+		}
+		
+		/* 分隔线 */
+		.navbar#menu-navbar .dropdown-menu .divider,
+		#menu-navbar ul li ul .divider {
+			background-color: #e0e0e0 !important;
+			height: 1px !important;
+			margin: 4px 0 !important;
+		}
+		
+		/* 延长悬停延迟以防止意外关闭 */
+		.navbar#menu-navbar .dropdown,
+		#menu-navbar ul li.dropdown {
+			position: relative;
+		}
+		
+		.navbar#menu-navbar .dropdown:hover,
+		#menu-navbar ul li.dropdown:hover,
+		.navbar#menu-navbar .dropdown:hover .dropdown-menu,
+		#menu-navbar ul li.dropdown:hover ul {
+			transition: all 0.1s ease-in-out;
 		}
 		</style>
 

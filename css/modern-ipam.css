@@ -1,0 +1,728 @@
+/**
+ * 现代化IPAM样式 - 清理优化版本
+ * 基于Material Design和现代UI设计原则
+ * 南京信息工程大学定制版本
+ */
+
+/* ===== CSS变量定义 ===== */
+:root {
+    /* 主色调 - 南信大标准色（调暗版） */
+    --primary-color: #002340;
+    --primary-dark: #001a30;
+    --primary-light: #003A5A;
+    
+    /* 状态色 */
+    --success-color: #4CAF50;
+    --warning-color: #FF9800;
+    --danger-color: #F44336;
+    --info-color: #002340;
+    
+    /* 灰度色彩 */
+    --gray-50: #FAFAFA;
+    --gray-100: #F5F5F5;
+    --gray-200: #EEEEEE;
+    --gray-300: #E0E0E0;
+    --gray-400: #BDBDBD;
+    --gray-500: #9E9E9E;
+    --gray-600: #757575;
+    --gray-700: #424242;
+    --gray-800: #212121;
+    --gray-900: #000000;
+    
+    /* 文字色彩 */
+    --text-primary: #1a1a1a;
+    --text-secondary: #4a4a4a;
+    --text-hint: #757575;
+    --text-strong: #000000;
+    
+    /* 背景色 */
+    --bg-primary: #F8F9FA;
+    --bg-secondary: #F0F2F5;
+    --bg-accent: #E8EAED;
+    --bg-card: #FFFFFF;
+    
+    /* 边框和阴影 */
+    --border-color: #DADCE0;
+    --border-light: #E8EAED;
+    --shadow-1: 0 1px 3px rgba(60,64,67,0.08);
+    --shadow-2: 0 2px 6px rgba(60,64,67,0.1);
+    --shadow-3: 0 4px 12px rgba(60,64,67,0.12);
+    
+    /* 圆角和间距 */
+    --border-radius-sm: 4px;
+    --border-radius: 6px;
+    --border-radius-lg: 8px;
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+}
+
+/* ===== 基础样式 ===== */
+body {
+    font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background-color: var(--bg-accent);
+}
+
+/* ===== 导航栏 ===== */
+.navbar#menu-navbar,
+nav.navbar#menu-navbar {
+    background: var(--primary-color) !important;
+    border: none !important;
+    box-shadow: var(--shadow-2) !important;
+    min-height: 48px !important;
+}
+
+.navbar#menu-navbar .navbar-nav > li > a {
+    color: white !important;
+    font-weight: 500 !important;
+    padding: 12px 18px !important;
+    transition: all 0.3s ease !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2) !important;
+}
+
+.navbar#menu-navbar .navbar-nav > li > a:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.navbar#menu-navbar .navbar-nav > li.active > a,
+.navbar#menu-navbar .navbar-nav > li.dropdown.open > a {
+    background-color: var(--primary-dark) !important;
+}
+
+/* 强制覆盖bootstrap-custom.css中的硬编码颜色 */
+body .navbar#menu-navbar,
+body nav.navbar#menu-navbar {
+    background: var(--primary-color) !important;
+}
+
+/* 下拉菜单统一样式 */
+.navbar#menu-navbar .dropdown-menu,
+#menu-navbar ul li ul {
+    background: var(--bg-card) !important;
+    border: none !important;
+    border-radius: var(--border-radius) !important;
+    box-shadow: var(--shadow-3) !important;
+    margin-top: 8px !important;
+}
+
+.navbar#menu-navbar .dropdown-menu li a,
+#menu-navbar ul li ul li a {
+    color: var(--text-primary) !important;
+    background-color: transparent !important;
+    padding: 12px 20px !important;
+    transition: all 0.2s ease !important;
+    font-size: 13px !important;
+}
+
+.navbar#menu-navbar .dropdown-menu li a:hover,
+#menu-navbar ul li ul li a:hover {
+    background-color: var(--primary-light) !important;
+    color: white !important;
+}
+
+.navbar#menu-navbar .dropdown-menu li.nav-header {
+    color: var(--text-secondary) !important;
+    background-color: var(--gray-100) !important;
+    font-weight: 600 !important;
+    padding: 8px 20px !important;
+}
+
+/* ===== 主容器 ===== */
+#mainContainer {
+    background-color: var(--bg-secondary);
+    padding: var(--spacing-lg);
+}
+
+#content {
+    padding: 0;
+}
+
+/* ===== 卡片系统 ===== */
+.panel,
+.panel-default,
+#dashboard .inner {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--border-radius-lg) !important;
+    box-shadow: var(--shadow-2) !important;
+    margin-bottom: var(--spacing-lg) !important;
+    transition: all 0.3s ease !important;
+}
+
+.panel-heading {
+    background: var(--bg-card) !important;
+    border-bottom: 1px solid var(--border-light) !important;
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0 !important;
+    padding: var(--spacing) var(--spacing-lg) !important;
+}
+
+.panel-body {
+    padding: var(--spacing-lg) !important;
+}
+
+.panel-heading h3,
+.panel-heading h4,
+.panel-heading h5 {
+    margin: 0 !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+}
+
+#dashboard .inner:hover {
+    box-shadow: var(--shadow-3) !important;
+    transform: translateY(-2px) !important;
+}
+
+#dashboard .inner h4 {
+    background: var(--bg-accent) !important;
+    border-bottom: 1px solid var(--border-light) !important;
+    padding: var(--spacing) var(--spacing-lg) !important;
+    margin: 0 !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    font-size: 16px !important;
+}
+
+#dashboard .hContent {
+    border-top: none !important;
+    padding: var(--spacing-lg) !important;
+}
+
+#dashboard.tools-all .inner .hContent .icon {
+    border-right: 1px solid var(--border-light) !important;
+    background: var(--bg-accent) !important;
+    width: 60px !important;
+    padding-top: var(--spacing-lg) !important;
+}
+
+#dashboard.tools-all .inner .hContent .icon i {
+    color: var(--primary-color) !important;
+    font-size: 28px !important;
+}
+
+#dashboard.tools-all .inner:hover .hContent .icon i {
+    color: var(--primary-dark) !important;
+}
+
+/* ===== 按钮样式 ===== */
+.btn {
+    border-radius: var(--border-radius) !important;
+    font-weight: 500 !important;
+    padding: 10px 20px !important;
+    transition: all 0.3s ease !important;
+    border: none !important;
+    cursor: pointer !important;
+}
+
+.btn-primary {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-dark) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-2) !important;
+}
+
+.btn-success {
+    background-color: var(--success-color) !important;
+    color: white !important;
+}
+
+.btn-success:hover {
+    background-color: #45a049 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-2) !important;
+}
+
+.btn-warning {
+    background-color: var(--warning-color) !important;
+    color: white !important;
+}
+
+.btn-warning:hover {
+    background-color: #f57c00 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-2) !important;
+}
+
+.btn-danger {
+    background-color: var(--danger-color) !important;
+    color: white !important;
+}
+
+.btn-danger:hover {
+    background-color: #d32f2f !important;
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-2) !important;
+}
+
+.btn-info {
+    background-color: var(--info-color) !important;
+    color: white !important;
+}
+
+.btn-info:hover {
+    background-color: #0097a7 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-2) !important;
+}
+
+.btn-default {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.btn-default:hover {
+    background-color: var(--gray-100) !important;
+    border-color: var(--gray-300) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-2) !important;
+}
+
+.btn-sm {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+}
+
+.btn-xs {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+}
+
+/* ===== 表格样式 ===== */
+.table {
+    background-color: var(--bg-card) !important;
+    border-radius: var(--border-radius-lg) !important;
+    overflow: hidden !important;
+    box-shadow: var(--shadow-2) !important;
+}
+
+.table th {
+    background-color: var(--gray-200) !important;
+    border-bottom: 2px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    padding: var(--spacing) !important;
+    border-top: none !important;
+}
+
+.table td {
+    border-top: 1px solid var(--border-light) !important;
+    padding: var(--spacing) !important;
+    vertical-align: middle !important;
+}
+
+.table-striped tbody tr:nth-child(odd) {
+    background-color: var(--gray-100) !important;
+}
+
+.table-striped tbody tr:nth-child(odd) td {
+    background-color: transparent !important;
+}
+
+.table tbody tr:hover {
+    background-color: var(--gray-50) !important;
+}
+
+.table tbody tr:hover td {
+    background-color: transparent !important;
+}
+
+/* ===== 表单控件 ===== */
+.form-control {
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--border-radius) !important;
+    padding: 12px 16px !important;
+    font-size: 14px !important;
+    transition: all 0.3s ease !important;
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px rgba(0, 58, 90, 0.1) !important;
+    outline: none !important;
+}
+
+.input-group-addon {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--border-radius) !important;
+}
+
+select.form-control {
+    appearance: none !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") !important;
+    background-position: right 12px center !important;
+    background-repeat: no-repeat !important;
+    background-size: 16px 12px !important;
+    padding-right: 40px !important;
+}
+
+/* ===== 提醒框 ===== */
+.alert {
+    border: none !important;
+    border-radius: var(--border-radius) !important;
+    padding: var(--spacing) var(--spacing-lg) !important;
+    margin-bottom: var(--spacing-lg) !important;
+}
+
+.alert-success {
+    background-color: #E8F5E8 !important;
+    color: #2E7D32 !important;
+    border-left: 4px solid var(--success-color) !important;
+}
+
+.alert-info {
+    background-color: #E3F2FD !important;
+    color: #1565C0 !important;
+    border-left: 4px solid var(--info-color) !important;
+}
+
+.alert-warning {
+    background-color: #FFF3E0 !important;
+    color: #E65100 !important;
+    border-left: 4px solid var(--warning-color) !important;
+}
+
+.alert-danger {
+    background-color: #FFEBEE !important;
+    color: #C62828 !important;
+    border-left: 4px solid var(--danger-color) !important;
+}
+
+/* ===== 分页 ===== */
+.pagination > li > a,
+.pagination > li > span {
+    color: var(--primary-color) !important;
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    padding: 8px 16px !important;
+    margin: 0 2px !important;
+    border-radius: var(--border-radius) !important;
+    transition: all 0.2s ease !important;
+}
+
+.pagination > li > a:hover {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+    border-color: var(--primary-color) !important;
+}
+
+.pagination > .active > a,
+.pagination > .active > span {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+/* ===== 标签 ===== */
+.label,
+.badge {
+    border-radius: var(--border-radius-sm) !important;
+    font-weight: 500 !important;
+}
+
+.label-primary,
+.badge-primary {
+    background-color: var(--primary-color) !important;
+}
+
+.label-success,
+.badge-success {
+    background-color: var(--success-color) !important;
+}
+
+.label-warning,
+.badge-warning {
+    background-color: var(--warning-color) !important;
+}
+
+.label-danger,
+.badge-danger {
+    background-color: var(--danger-color) !important;
+}
+
+.label-info,
+.badge-info {
+    background-color: var(--info-color) !important;
+}
+
+/* ===== 进度条 ===== */
+.progress {
+    background-color: var(--gray-200) !important;
+    border-radius: var(--border-radius) !important;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1) !important;
+    height: 20px !important;
+}
+
+.progress-bar {
+    border-radius: var(--border-radius) !important;
+    transition: width 0.6s ease !important;
+}
+
+.progress-bar-primary {
+    background-color: var(--primary-color) !important;
+}
+
+.progress-bar-success {
+    background-color: var(--success-color) !important;
+}
+
+.progress-bar-info {
+    background-color: var(--info-color) !important;
+}
+
+.progress-bar-warning {
+    background-color: var(--warning-color) !important;
+}
+
+.progress-bar-danger {
+    background-color: var(--danger-color) !important;
+}
+
+/* ===== 弹窗和模态框 ===== */
+.modal-content,
+.popup {
+    border: none !important;
+    border-radius: var(--border-radius-lg) !important;
+    box-shadow: var(--shadow-3) !important;
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-header,
+.popup .pHeader {
+    background-color: var(--bg-accent) !important;
+    border-bottom: 1px solid var(--border-light) !important;
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0 !important;
+    padding: var(--spacing-lg) !important;
+}
+
+.modal-header h4,
+.modal-header h3,
+.modal-title,
+.popup .pHeader,
+.popup .pHeader h4 {
+    color: var(--text-strong) !important;
+    font-weight: 600 !important;
+}
+
+.modal-body,
+.popup .pContent {
+    padding: var(--spacing-lg) !important;
+    color: var(--text-primary) !important;
+    background-color: var(--bg-card) !important;
+}
+
+.modal-body label,
+.popup .pContent label,
+.popup .pContent th {
+    color: var(--text-strong) !important;
+    font-weight: 500 !important;
+}
+
+.modal-body .form-control,
+.popup .pContent .form-control {
+    color: var(--text-primary) !important;
+    background-color: var(--bg-card) !important;
+}
+
+.modal-body .help-block,
+.modal-body small,
+.modal-body .text-muted,
+.popup .pContent .help-block,
+.popup .pContent small,
+.popup .pContent .text-muted {
+    color: var(--text-secondary) !important;
+}
+
+.modal-footer,
+.popup .pFooter {
+    background-color: var(--bg-accent) !important;
+    border-top: 1px solid var(--border-light) !important;
+    border-radius: 0 0 var(--border-radius-lg) var(--border-radius-lg) !important;
+    padding: var(--spacing) var(--spacing-lg) !important;
+}
+
+.popup table.table th {
+    background-color: var(--gray-200) !important;
+    color: var(--text-strong) !important;
+    font-weight: 600 !important;
+}
+
+.popup table.table td {
+    color: var(--text-primary) !important;
+}
+
+.popup .input-group-addon {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* ===== 面包屑导航 ===== */
+.breadcrumb {
+    background: transparent !important;
+    border-radius: var(--border-radius) !important;
+    padding: var(--spacing-sm) 0 !important;
+    margin-bottom: var(--spacing-lg) !important;
+}
+
+.breadcrumb > li + li:before {
+    color: var(--text-hint) !important;
+    content: "/" !important;
+    padding: 0 8px !important;
+}
+
+.breadcrumb > li > a {
+    color: var(--primary-color) !important;
+    text-decoration: none !important;
+}
+
+.breadcrumb > li > a:hover {
+    color: var(--primary-dark) !important;
+    text-decoration: underline !important;
+}
+
+/* ===== 工具提示 ===== */
+.tooltip-inner {
+    background-color: var(--gray-800) !important;
+    border-radius: var(--border-radius) !important;
+    font-size: 12px !important;
+    padding: 6px 12px !important;
+}
+
+/* ===== 加载动画 ===== */
+.loading {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    color: var(--text-primary) !important;
+    font-size: 16px !important;
+    font-weight: 500 !important;
+}
+
+.loading i {
+    color: var(--primary-color) !important;
+    font-size: 24px !important;
+}
+
+/* ===== 滚动条 ===== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: var(--border-radius);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--gray-400);
+    border-radius: var(--border-radius);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-500);
+}
+
+/* ===== 主题特色 ===== */
+h1, h2, h3, h4, h5, .pHeader {
+    color: var(--primary-color) !important;
+}
+
+a {
+    color: var(--primary-color) !important;
+}
+
+a:hover {
+    color: var(--primary-dark) !important;
+}
+
+.nav-tabs > .active > a,
+.nav-tabs > .active > a:hover,
+.nav-tabs > .active > a:focus {
+    color: var(--primary-color) !important;
+    border-bottom-color: var(--primary-color) !important;
+}
+
+.navbar-brand,
+.hero-unit a {
+    color: var(--primary-color) !important;
+    font-weight: 600 !important;
+}
+
+/* ===== 侧边栏和菜单优化 ===== */
+#leftMenu,
+.adminMenu,
+.toolsMenu {
+    background-color: var(--bg-secondary) !important;
+    border-radius: var(--border-radius) !important;
+    padding: var(--spacing) !important;
+}
+
+.adminMenu .panel-heading,
+.toolsMenu .panel-heading {
+    background-color: var(--bg-secondary) !important;
+}
+
+.adminMenu .list-group-item,
+.toolsMenu .list-group-item {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-light) !important;
+}
+
+.adminMenu .list-group-item:hover,
+.toolsMenu .list-group-item:hover {
+    background-color: var(--primary-light) !important;
+    color: white !important;
+}
+
+table#subnetsMenu td#subnetsLeft {
+    background-color: var(--bg-secondary) !important;
+}
+
+/* ===== 页脚 ===== */
+.footer {
+    background-color: var(--bg-secondary) !important;
+    border-top: 1px solid var(--border-color) !important;
+    color: var(--text-secondary) !important;
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 768px) {
+    #mainContainer {
+        padding: var(--spacing);
+    }
+    
+    .panel-body {
+        padding: var(--spacing) !important;
+    }
+    
+    #dashboard .inner {
+        margin: var(--spacing-xs) !important;
+    }
+    
+    .btn {
+        padding: 8px 16px !important;
+    }
+    
+    .navbar#menu-navbar {
+        min-height: 44px !important;
+    }
+    
+    .navbar#menu-navbar .navbar-nav > li > a {
+        padding: 10px 16px !important;
+    }
+}
+/* Cache-bust: 1750754150 */

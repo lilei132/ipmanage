@@ -272,6 +272,11 @@ require( dirname(__FILE__) . '/../admin/admin-menu-config.php' );
                 </a>
             </li>
             <li>
+                <a href="<?php print create_link("tools", "devices"); ?>">
+                    <i class="fa fa-desktop"></i> <?php print _("设备列表"); ?>
+                </a>
+            </li>
+            <li>
                 <a href="<?php print create_link("subnets"); ?>">
                     <i class="fa fa-sitemap"></i> <?php print _("子网管理"); ?>
                 </a>

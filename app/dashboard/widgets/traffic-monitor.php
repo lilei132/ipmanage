@@ -197,19 +197,14 @@ try {
 <!-- JS -->
 <script>
 $(document).ready(function() {
-    console.log('流量监控小部件初始化中...');
-    
     // 从PHP获取卡片数据
     var trafficCards = <?php echo json_encode($traffic_cards_data); ?>;
-    
-    console.log('从数据库加载到 ' + trafficCards.length + ' 个卡片');
     
     // 卡片容器
     const $container = $('#traffic-widget-container');
     
     // 检查是否有卡片
     if (!trafficCards || trafficCards.length === 0) {
-        console.log('没有卡片，显示提示信息');
         $container.html('<div class="no-cards"><?php print _("暂无流量监控卡片。请前往流量监控页面添加卡片。"); ?></div>');
         return;
     }

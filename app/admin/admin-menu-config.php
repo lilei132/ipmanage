@@ -68,7 +68,6 @@ if($User->settings->enableLocations == 1)
 $admin_menu[_('Device management')][]  =    ["show"=>true, "icon"=>"fa-map",            "href"=>"locations",              "name"=>_("Locations"),                "description"=>_("Locations")];
 
 # Tools
-$admin_menu[_('Tools')][] =                 ["show"=>true, "icon"=>"fa-check",          "href"=>"version-check",          "name"=>_("Version check"),            "description"=>_("Check for latest version of phpipam")];
 $admin_menu[_('Tools')][] =                 ["show"=>true, "icon"=>"fa-magic",          "href"=>"verify-database",        "name"=>_("Verify database"),          "description"=>_("Verify that database files are installed ok")];
 $admin_menu[_('Tools')][] =                 ["show"=>true, "icon"=>"fa-search-plus",    "href"=>"replace-fields",         "name"=>_("Replace fields"),           "description"=>_("Search and replace content in database")];
 
@@ -103,7 +102,6 @@ $admin_menu_items = [
                     "tags"                   => _("tags"),
                     "users"                  => _("users"),
                     "verify-database"        => _("verify-database"),
-                    "version-check"          => _("version-check"),
                     "vlans"                  => _("vlans"),
                     "vrf"                    => _("vrf"),
                     "widgets"                => _("widgets"),

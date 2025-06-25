@@ -171,31 +171,7 @@ if($User->is_admin(false)) {
 
 	<?php
 	}
-
-	# check for new version periodically, 1x/week
-	if( $User->is_admin(false) && (strtotime(date("Y-m-d H:i:s")) - strtotime($User->settings->vcheckDate)) > 604800 ) {
-		# check for new version
-		if(!$version = $Tools->check_latest_phpipam_version ()) {
-			# we failed, so NW is not ok. update time anyway to avoid future failures
-			$Tools->update_phpipam_checktime ();
-		} else {
-			# new version available
-			if ($Tools->cmp_version_strings(VERSION_VISIBLE, $version) < 0) {
-				print "<li>";
-				print "	<a href='".create_link("administration","version-check")."' class='btn-warning' rel='tooltip' data-placement='bottom' title='"._('New version available')."'><i class='fa fa-bullhorn'></i><sup>$version</sup></a>";
-				print "</li>";
-			} else {
-				# version ok
-				$Tools->update_phpipam_checktime ();
-			}
-		}
-	}
-
-	if ($User->is_admin(false) && $Tools->cmp_version_strings(VERSION, $User->settings->version) != 0) {
-		print "<li>";
-		print "	<a href='".create_link("administration","version-check")."' class='btn-danger' rel='tooltip' data-placement='bottom' title='"._("Incompatible php and database schema versions")."'><i class='fa fa-bullhorn'></i><sup>".$User->settings->version."</sup></a>";
-		print "</li>";
-	}
+	// 版本检查功能已移除
 	?>
 
 </ul>
